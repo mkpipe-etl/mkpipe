@@ -57,10 +57,3 @@ For more detailed documentation, please visit the [GitHub repository](https://gi
 
 This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
-## Support Me
-
-If you enjoy this project, consider supporting me:
-
-<iframe src="https://github.com/sponsors/m-karakus/button" title="Sponsor m-karakus" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
-
-[Support on GitHub](https://github.com/sponsors/m-karakus?frequency=one-time&sponsor=m-karakus)
