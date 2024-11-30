@@ -19,3 +19,15 @@ LOADER_GROUP = "mkpipe.loaders"
 
 EXTRACTORS = discover_plugins(EXTRACTOR_GROUP)
 LOADERS = discover_plugins(LOADER_GROUP)
+
+
+def get_loader(variant):
+    if variant not in LOADERS:
+        raise ValueError(f'Unsupported database type: {variant}')
+    return LOADERS.get(variant)
+
+def get_extractor(variant):
+    if variant not in EXTRACTORS:
+        raise ValueError(f'Unsupported extractor type: {variant}')
+    return EXTRACTORS.get(variant)
+

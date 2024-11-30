@@ -17,7 +17,7 @@
 
 ### Added
 - First official release of MkPipe.
-- Basic implementation of the `mkpipe-core` package and `mkpipe-extractor-postgres` extractor plugin.
+- Basic implementation of the `mkpipe` package and `mkpipe-extractor-postgres` extractor plugin.
 
 ### Changed
 - None.

@@ -16,7 +16,7 @@ You can install the core package and extractors using pip:
 
 ### Install the core package:
 ```bash
-pip install mkpipe-core
+pip install mkpipe
 ```
 
 ### Install the Postgres extractor:
