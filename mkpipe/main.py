@@ -10,11 +10,10 @@ time.tzset()
 
 
 # Function to manage priority levels and reset if necessary
-def get_priority(pipeline_name, priority):
+def get_priority(pipeline_name, priority, custom_priority):
     """Adjust priority based on pipeline name or reset if necessary."""
-    low_priority_pipelines = {}
-    if pipeline_name in low_priority_pipelines:
-        return 1  # Lowest priority
+    if custom_priority:
+        return custom_priority
     priority -= 1
     return 200 if priority < 1 else priority
 
@@ -24,8 +23,8 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
     logger.log({'file_name': config_file_name})
 
     DATA = load_config(config_file=config_file_name)
-    parallel_run = get_config_value(
-        ['settings', 'parallel_run'], file_name=config_file_name
+    run_coordinator = get_config_value(
+        ['settings', 'run_coordinator'], file_name=config_file_name
     )
 
     # Validate that pipeline_name_set and table_name_set are sets
@@ -51,6 +50,7 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
         pipeline_name = job['name']
         extract_task = job['extract_task']
         load_task = job['load_task']
+        custom_priority = job.get('priority', None)
 
         print(f'Running pipeline: {pipeline_name}')
 
@@ -97,7 +97,7 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
             current_table_conf.pop('tables', None)
 
             # Get the adjusted priority level for the current pipeline
-            priority = get_priority(pipeline_name, priority)
+            priority = get_priority(pipeline_name, priority, custom_priority)
 
             # Add the extraction task to the chord group, using kwargs
             task_group.append(
