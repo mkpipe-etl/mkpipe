@@ -13,6 +13,8 @@ setup(
         'mkpipe.transformers': [],
     },
     description='Core ETL pipeline framework for mkpipe.',
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     author='Metin Karakus',
     author_email='metin_karakus@yahoo.com',
     classifiers=[
