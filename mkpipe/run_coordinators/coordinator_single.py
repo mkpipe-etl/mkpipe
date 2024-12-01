@@ -1,6 +1,7 @@
 import datetime
 from ..plugins import get_extractor, get_loader
 
+
 class CoordinatorSingle:
     def __init__(self, task_group):
         self.task_group = task_group
@@ -17,8 +18,6 @@ class CoordinatorSingle:
 
         print('Loaded data successfully!')
         return True  # Return True to indicate success
-
-
 
     def extract_data(self, task):
         # Initialize extractor and loader instances

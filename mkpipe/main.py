@@ -4,7 +4,6 @@ from .config import load_config, get_config_value, timezone
 from .run_coordinators import get_coordinator
 
 from .utils import Logger, InputTask
-from .run_coordinators.coordinator_celery import extract_data, run_parallel_tasks
 
 os.environ['TZ'] = timezone
 time.tzset()
@@ -100,21 +99,20 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
             # Get the adjusted priority level for the current pipeline
             priority = get_priority(pipeline_name, priority, custom_priority)
 
-            task = InputTask(extractor_variant=extractor_variant,
-                    current_table_conf=current_table_conf,
-                    loader_variant=loader_variant,
-                    loader_conf=loader_conf,
-                    priority=custom_priority
-                    )
-            
+            task = InputTask(
+                extractor_variant=extractor_variant,
+                current_table_conf=current_table_conf,
+                loader_variant=loader_variant,
+                loader_conf=loader_conf,
+                priority=custom_priority,
+            )
+
             # Add the extraction task to the chord group, using kwargs
             task_group.append(task)
-            
 
     if not task_group:
         logger.log({'warning': 'No tasks were scheduled to run.'})
         return
-
 
     coordinator = get_coordinator(run_coordinator)(task_group)
     coordinator.run()

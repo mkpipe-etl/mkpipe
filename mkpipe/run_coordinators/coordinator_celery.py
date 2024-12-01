@@ -24,7 +24,9 @@ class CoordinatorCelery:
         broker_host = os.getenv('BROKER_HOST', 'rabbitmq')
         broker_port = os.getenv('BROKER_PORT', '5672')
 
-        CELERY_BROKER_URL = f'amqp://{broker_user}:{broker_pass}@{broker_host}:{broker_port}//'
+        CELERY_BROKER_URL = (
+            f'amqp://{broker_user}:{broker_pass}@{broker_host}:{broker_port}//'
+        )
         CELERY_BACKEND_URL = os.getenv('CELERY_BACKEND_URL', 'rpc://')
 
         app = Celery('celery_app')
@@ -62,7 +64,13 @@ class CoordinatorCelery:
     def register_tasks(self):
         """Register tasks dynamically after app initialization."""
 
-        @self.app.task(bind=True, max_retries=3, retry_backoff=True, retry_backoff_jitter=True, track_started=True)
+        @self.app.task(
+            bind=True,
+            max_retries=3,
+            retry_backoff=True,
+            retry_backoff_jitter=True,
+            track_started=True,
+        )
         def extract_data(self_task, **kwargs):
             extractor_variant = kwargs['extractor_variant']
             current_table_conf = kwargs['current_table_conf']
@@ -89,7 +97,13 @@ class CoordinatorCelery:
             print('Extracted data successfully!')
             return True
 
-        @self.app.task(bind=True, max_retries=3, retry_backoff=True, retry_backoff_jitter=True, track_started=True)
+        @self.app.task(
+            bind=True,
+            max_retries=3,
+            retry_backoff=True,
+            retry_backoff_jitter=True,
+            track_started=True,
+        )
         def load_data(self_task, **kwargs):
             loader_variant = kwargs['loader_variant']
             loader_conf = kwargs['loader_conf']

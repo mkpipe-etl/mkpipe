@@ -23,10 +23,7 @@ def coordinator_celery(conf):
     return CoordinatorCelery(conf)
 
 
-
-
 def get_coordinator(variant):
     if variant not in RUN_COORDINATORS:
         raise ValueError(f'Unsupported coordinator type: {variant}')
     return RUN_COORDINATORS.get(variant)
-
