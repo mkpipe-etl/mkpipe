@@ -8,4 +8,4 @@ class InputTask(BaseModel):
     loader_variant: str
     loader_conf: dict
     priority: Optional[int] = None
-    data: Optional[dict]
+    data: Optional[dict] = None

@@ -25,7 +25,7 @@ LOADERS = discover_plugins(LOADER_GROUP)
 
 def get_loader(variant):
     if variant not in LOADERS:
-        raise ValueError(f'Unsupported database type: {variant}')
+        raise ValueError(f'Unsupported loader type: {variant}')
     return LOADERS.get(variant)
 
 
