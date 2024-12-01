@@ -28,9 +28,7 @@ exclude = [
     "node_modules",
     "site-packages",
     "venv",
-    "env",
-    "other_apps",
-    "arcive"
+    "env"
 ]
 
 # Include .ipynb files to ensure Jupyter notebooks are also linted.
