@@ -1,5 +1,6 @@
 import importlib.metadata
 
+
 def discover_plugins(group):
     """
     Discover plugins registered under a specific entry point group.
@@ -10,12 +11,13 @@ def discover_plugins(group):
         entry_points = importlib.metadata.entry_points(group=group)
         return {ep.name: ep.load() for ep in entry_points}
     except Exception as e:
-        print(f"Error discovering plugins: {e}")
+        print(f'Error discovering plugins: {e}')
         return {}
 
+
 # Example usage
-EXTRACTOR_GROUP = "mkpipe.extractors"
-LOADER_GROUP = "mkpipe.loaders"
+EXTRACTOR_GROUP = 'mkpipe.extractors'
+LOADER_GROUP = 'mkpipe.loaders'
 
 EXTRACTORS = discover_plugins(EXTRACTOR_GROUP)
 LOADERS = discover_plugins(LOADER_GROUP)
@@ -26,8 +28,8 @@ def get_loader(variant):
         raise ValueError(f'Unsupported database type: {variant}')
     return LOADERS.get(variant)
 
+
 def get_extractor(variant):
     if variant not in EXTRACTORS:
         raise ValueError(f'Unsupported extractor type: {variant}')
     return EXTRACTORS.get(variant)
-

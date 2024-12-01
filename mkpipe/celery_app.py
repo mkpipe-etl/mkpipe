@@ -153,5 +153,3 @@ def run_parallel_tasks(task_group):
             routing_key='mkpipe',
         ),
     ).apply_async()
-
-

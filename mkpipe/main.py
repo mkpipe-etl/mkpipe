@@ -19,15 +19,14 @@ def get_priority(pipeline_name, priority):
     return 200 if priority < 1 else priority
 
 
-
-
 def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
     logger = Logger(config_file_name)
     logger.log({'file_name': config_file_name})
 
     DATA = load_config(config_file=config_file_name)
-    parallel_run = get_config_value(['settings', 'parallel_run'],file_name=config_file_name)
-
+    parallel_run = get_config_value(
+        ['settings', 'parallel_run'], file_name=config_file_name
+    )
 
     # Validate that pipeline_name_set and table_name_set are sets
     if pipeline_name_set and not isinstance(pipeline_name_set, set):
@@ -120,4 +119,3 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
         return
 
     run_parallel_tasks(task_group)
-

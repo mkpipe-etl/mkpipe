@@ -1,6 +1,6 @@
-import os
 import yaml
 from pathlib import Path
+
 ROOT_DIR = Path(__file__).parent.resolve()
 
 timezone = 'UTC'
@@ -11,7 +11,6 @@ default_iterate_max_loop = 1_000
 default_iterate_batch_size = 500_000
 
 
-
 def update_globals(config):
     """Update global variables based on the provided config dictionary."""
     global_vars = globals()
@@ -20,21 +19,19 @@ def update_globals(config):
             global_vars[key] = value
 
 
-
-
-
-
 def load_config(config_file):
     config_path = Path(config_file).resolve()
     if not config_path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        raise FileNotFoundError(f'Configuration file not found: {config_path}')
 
     global ROOT_DIR
     ROOT_DIR = config_path.parent
 
     with config_path.open('r') as f:
         data = yaml.safe_load(f)
-        ENV = data.get('default_environment', 'prod')  # Default to 'prod' if not specified
+        ENV = data.get(
+            'default_environment', 'prod'
+        )  # Default to 'prod' if not specified
         env_config = data.get(ENV, {})
 
     # Extract settings under the 'settings' key

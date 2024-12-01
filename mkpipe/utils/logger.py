@@ -8,8 +8,8 @@ from dagster import get_dagster_logger
 from ..config import ROOT_DIR
 
 path = os.path.abspath(os.path.join(ROOT_DIR, 'logs'))
-#path = ROOT_DIR / "logs"
-#path.mkdir(exist_ok=True)  # Create the directory if it doesn't exist
+# path = ROOT_DIR / "logs"
+# path.mkdir(exist_ok=True)  # Create the directory if it doesn't exist
 
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 
@@ -23,6 +23,8 @@ log_levels = {
 }
 
 default_log_level = log_levels.get(LOG_LEVEL.lower())
+
+
 class Logger:
     def __init__(self, name) -> None:
         """
@@ -180,5 +182,3 @@ def log_container(name):
         return wrapper
 
     return inner
-
-
