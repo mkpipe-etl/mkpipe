@@ -8,7 +8,7 @@ class CoordinatorSingle:
 
     def load_data(self, task):
         # Initialize loader instance
-        loader = get_loader(task.loader_variant)(task.loader_conf)
+        loader = get_loader(task.loader_variant)(task.loader_conf, task.settings)
 
         # Record the start time of the loading process
         elt_start_time = datetime.datetime.now()
@@ -21,7 +21,7 @@ class CoordinatorSingle:
 
     def extract_data(self, task):
         # Initialize extractor and loader instances
-        extractor = get_extractor(task.extractor_variant)(task.current_table_conf)
+        extractor = get_extractor(task.extractor_variant)(task.current_table_conf, task.settings)
 
         # Perform the data extraction
         task.data = extractor.extract()
