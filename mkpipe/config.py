@@ -1,7 +1,9 @@
+import os
 import yaml
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).parent.resolve()
+ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_PATH', '/tmp/mkpipe'))
+ROOT_DIR.mkdir(parents=True, exist_ok=True)
 
 timezone = 'UTC'
 spark_driver_memory = '4g'
@@ -9,7 +11,7 @@ spark_executor_memory = '3g'
 partitions_count = 2
 default_iterate_max_loop = 1_000
 default_iterate_batch_size = 500_000
-
+CONFIG_FILE = None
 
 def update_globals(config):
     """Update global variables based on the provided config dictionary."""
@@ -19,13 +21,13 @@ def update_globals(config):
             global_vars[key] = value
 
 
-def load_config(config_file):
-    config_path = Path(config_file).resolve()
+def load_config(config_file=None):
+    global CONFIG_FILE
+    if config_file:
+        CONFIG_FILE = config_file
+    config_path = Path(CONFIG_FILE).resolve()
     if not config_path.exists():
         raise FileNotFoundError(f'Configuration file not found: {config_path}')
-
-    global ROOT_DIR
-    ROOT_DIR = config_path.parent
 
     with config_path.open('r') as f:
         data = yaml.safe_load(f)

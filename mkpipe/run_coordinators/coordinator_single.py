@@ -26,6 +26,7 @@ class CoordinatorSingle:
         # Perform the data extraction
         task.data = extractor.extract()
         print('Extracted data successfully!')
+        print(task.data)
 
         if task.data:
             # Schedule the data loading as a separate task

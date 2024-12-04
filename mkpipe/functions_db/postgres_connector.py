@@ -61,11 +61,13 @@ def retry_on_failure(max_attempts=5, delay=1):
     return decorator
 
 
+
 @retry_on_failure()
 def get_table_status(name):
     """
     Check the status of a table from the manifest. If the updated_time is older than 1 day,
     update the status to 'failed' and return 'failed'. Otherwise, return the current status.
+    If the table does not exist, create it first.
     """
     config = load_config()
     connection_params = config['connections']['elt_logging']
@@ -73,10 +75,26 @@ def get_table_status(name):
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
+        # Ensure the manifest table exists
         with conn.cursor() as cursor:
-            # Retrieve status and updated_time
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS manifest (
+                    table_name VARCHAR(255) NOT NULL,
+                    last_point VARCHAR(50),
+                    type VARCHAR(50),
+                    replication_method VARCHAR(20) CHECK (replication_method IN ('incremental', 'full')),
+                    status VARCHAR(20) CHECK (status IN ('completed', 'failed', 'extracting', 'loading', 'extracted', 'loaded')),
+                    error_message TEXT,
+                    updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT unique_table_name UNIQUE (table_name)  -- Unique constraint on table_name
+                );
+            """)
+            conn.commit()
+
+        # Check table status
+        with conn.cursor() as cursor:
             cursor.execute(
-                'SELECT status, updated_time FROM dwh_opr.manifest WHERE table_name = %s',
+                'SELECT status, updated_time FROM manifest WHERE table_name = %s',
                 (name,),
             )
             result = cursor.fetchone()
@@ -89,7 +107,7 @@ def get_table_status(name):
                 if time_diff > timedelta(days=1):
                     # Update status to 'failed' if updated_time is older than 1 day
                     cursor.execute(
-                        'UPDATE dwh_opr.manifest SET status = %s, updated_time = CURRENT_TIMESTAMP WHERE table_name = %s',
+                        'UPDATE manifest SET status = %s, updated_time = CURRENT_TIMESTAMP WHERE table_name = %s',
                         ('failed', name),
                     )
                     conn.commit()
@@ -113,7 +131,7 @@ def get_last_point(name):
         with conn.cursor() as cursor:
             # Retrieve last_point
             cursor.execute(
-                'SELECT last_point FROM dwh_opr.manifest WHERE table_name = %s', (name,)
+                'SELECT last_point FROM manifest WHERE table_name = %s', (name,)
             )
             result = cursor.fetchone()
             return result[0] if result else None
@@ -140,7 +158,7 @@ def manifest_table_update(
     with db_connector(connection_params) as conn:
         with conn.cursor() as cursor:
             cursor.execute(
-                'SELECT table_name FROM dwh_opr.manifest WHERE table_name = %s', (name,)
+                'SELECT table_name FROM manifest WHERE table_name = %s', (name,)
             )
             if cursor.fetchone():
                 # Prepare update fields
@@ -173,7 +191,7 @@ def manifest_table_update(
 
                 # Construct the update SQL statement
                 update_sql = f"""
-                    UPDATE dwh_opr.manifest
+                    UPDATE manifest
                     SET {', '.join(update_fields)}
                     WHERE table_name = %s
                 """
@@ -182,7 +200,7 @@ def manifest_table_update(
                 # Insert new entry with updated_time set to default (CURRENT_TIMESTAMP)
                 cursor.execute(
                     """
-                    INSERT INTO dwh_opr.manifest (table_name, last_point, type, status, replication_method, error_message, updated_time)
+                    INSERT INTO manifest (table_name, last_point, type, status, replication_method, error_message, updated_time)
                     VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                     """,
                     (
