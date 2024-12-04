@@ -61,7 +61,6 @@ def retry_on_failure(max_attempts=5, delay=1):
     return decorator
 
 
-
 @retry_on_failure()
 def get_table_status(name):
     """

@@ -2,16 +2,11 @@ import os
 import yaml
 from pathlib import Path
 
+CONFIG_FILE = None
+TIMEZONE = Path(os.getenv('MKPIPE_PROJECT_TIMEZONE', 'UTC'))
 ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_PATH', '/tmp/mkpipe'))
 ROOT_DIR.mkdir(parents=True, exist_ok=True)
 
-timezone = 'UTC'
-spark_driver_memory = '4g'
-spark_executor_memory = '3g'
-partitions_count = 2
-default_iterate_max_loop = 1_000
-default_iterate_batch_size = 500_000
-CONFIG_FILE = None
 
 def update_globals(config):
     """Update global variables based on the provided config dictionary."""

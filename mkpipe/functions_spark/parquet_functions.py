@@ -64,9 +64,7 @@ def remove_partitioned_parquet(directory_path):
 
 
 def write_schema(schema, table_name):
-    folder_path = os.path.abspath(
-        os.path.join(ROOT_DIR, 'artifacts', 'schemas')
-    )
+    folder_path = os.path.abspath(os.path.join(ROOT_DIR, 'artifacts', 'schemas'))
     # schema = df.schema.json()
     json_object = json.dumps(schema, indent=4)
     schema_path = os.path.join(folder_path, f'schema_{table_name}.json')
@@ -76,9 +74,7 @@ def write_schema(schema, table_name):
 
 
 def read_schema(table_name):
-    folder_path = os.path.abspath(
-        os.path.join(ROOT_DIR, 'artifacts', 'schemas')
-    )
+    folder_path = os.path.abspath(os.path.join(ROOT_DIR, 'artifacts', 'schemas'))
     schema_path = os.path.join(folder_path, f'schema_{table_name}.json')
     with open(schema_path, 'r') as f:
         schema_map = json.load(f)

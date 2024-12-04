@@ -1,11 +1,11 @@
 import os
 import time
-from .config import load_config, get_config_value, timezone, ROOT_DIR
+from .config import load_config, get_config_value, TIMEZONE, ROOT_DIR
 from .run_coordinators import get_coordinator
 
 from .utils import Logger, InputTask, PipeSettings
 
-os.environ['TZ'] = timezone
+os.environ['TZ'] = TIMEZONE
 time.tzset()
 
 
@@ -105,7 +105,7 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
                 loader_variant=loader_variant,
                 loader_conf=loader_conf,
                 priority=custom_priority,
-                settings=PipeSettings(ROOT_DIR=str(ROOT_DIR))
+                settings=PipeSettings(ROOT_DIR=str(ROOT_DIR)),
             )
 
             # Add the extraction task to the chord group, using kwargs

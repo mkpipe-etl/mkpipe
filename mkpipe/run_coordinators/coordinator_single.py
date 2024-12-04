@@ -21,7 +21,9 @@ class CoordinatorSingle:
 
     def extract_data(self, task):
         # Initialize extractor and loader instances
-        extractor = get_extractor(task.extractor_variant)(task.current_table_conf, task.settings)
+        extractor = get_extractor(task.extractor_variant)(
+            task.current_table_conf, task.settings
+        )
 
         # Perform the data extraction
         task.data = extractor.extract()
