@@ -23,6 +23,9 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
     logger.log({'file_name': config_file_name})
 
     DATA = load_config(config_file=config_file_name)
+
+    settings_values = get_config_value(['settings'], file_name=config_file_name)
+    settings = PipeSettings(ROOT_DIR=str(ROOT_DIR), **settings_values)
     run_coordinator = get_config_value(
         ['settings', 'run_coordinator'], file_name=config_file_name
     )
@@ -105,7 +108,7 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
                 loader_variant=loader_variant,
                 loader_conf=loader_conf,
                 priority=custom_priority,
-                settings=PipeSettings(ROOT_DIR=str(ROOT_DIR)),
+                settings=settings,
             )
 
             # Add the extraction task to the chord group, using kwargs

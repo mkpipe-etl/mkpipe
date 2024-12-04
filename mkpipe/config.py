@@ -3,7 +3,7 @@ import yaml
 from pathlib import Path
 
 CONFIG_FILE = None
-TIMEZONE = Path(os.getenv('MKPIPE_PROJECT_TIMEZONE', 'UTC'))
+TIMEZONE = os.getenv('MKPIPE_PROJECT_TIMEZONE', 'UTC')
 ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_PATH', '/tmp/mkpipe'))
 ROOT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -30,10 +30,6 @@ def load_config(config_file=None):
             'default_environment', 'prod'
         )  # Default to 'prod' if not specified
         env_config = data.get(ENV, {})
-
-    # Extract settings under the 'settings' key
-    settings = env_config.get('settings', {})
-    update_globals(settings)
 
     return env_config
 
