@@ -69,8 +69,8 @@ def get_table_status(name):
     If the table does not exist, create it first.
     """
     config = load_config()
-    connection_params = config['connections']['elt_logging']
-    db_type = config['connections']['elt_logging']['database_type']
+    connection_params = config['settings']['backend']
+    db_type = config['settings']['backend']['database_type']
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
@@ -122,8 +122,8 @@ def get_table_status(name):
 @retry_on_failure()
 def get_last_point(name):
     config = load_config()
-    connection_params = config['connections']['elt_logging']
-    db_type = config['connections']['elt_logging']['database_type']
+    connection_params = config['settings']['backend']
+    db_type = config['settings']['backend']['database_type']
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
@@ -150,8 +150,8 @@ def manifest_table_update(
     In case of failure, log the error message.
     """
     config = load_config()
-    connection_params = config['connections']['elt_logging']
-    db_type = config['connections']['elt_logging']['database_type']
+    connection_params = config['settings']['backend']
+    db_type = config['settings']['backend']['database_type']
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:

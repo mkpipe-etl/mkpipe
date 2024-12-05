@@ -1,6 +1,6 @@
 import os
 import time
-from .config import load_config, get_config_value, TIMEZONE, ROOT_DIR
+from .config import load_config, get_config_value, TIMEZONE, ROOT_DIR, CONFIG_FILE
 from .run_coordinators import get_coordinator
 
 from .utils import Logger, InputTask, PipeSettings
@@ -18,7 +18,9 @@ def get_priority(pipeline_name, priority, custom_priority):
     return 200 if priority < 1 else priority
 
 
-def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
+def main(config_file_name: str=None, pipeline_name_set=None, table_name_set=None):
+    if not config_file_name:
+        config_file_name = CONFIG_FILE 
     logger = Logger(config_file_name)
     logger.log({'file_name': config_file_name})
 
@@ -118,5 +120,5 @@ def main(config_file_name: str, pipeline_name_set=None, table_name_set=None):
         logger.log({'warning': 'No tasks were scheduled to run.'})
         return
 
-    coordinator = get_coordinator(run_coordinator)(task_group)
+    coordinator = get_coordinator(run_coordinator)(task_group, settings)
     coordinator.run()

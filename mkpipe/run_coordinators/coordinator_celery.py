@@ -5,13 +5,15 @@ from dotenv import load_dotenv
 import os
 import datetime
 from ..plugins import get_extractor, get_loader
+from urllib.parse import quote_plus
 
 
 class CoordinatorCelery:
-    def __init__(self, task_group):
+    def __init__(self, task_group, settings):
         self.task_group = task_group
         self.app = self.initialize_celery()
         self.register_tasks()
+        self.settings = settings
 
     def initialize_celery(self):
         # Load environment variables
@@ -24,6 +26,7 @@ class CoordinatorCelery:
         broker_host = os.getenv('BROKER_HOST', 'rabbitmq')
         broker_port = os.getenv('BROKER_PORT', '5672')
 
+        quote_plus(str(self.connection_params['password']))
         CELERY_BROKER_URL = (
             f'amqp://{broker_user}:{broker_pass}@{broker_host}:{broker_port}//'
         )
@@ -76,8 +79,9 @@ class CoordinatorCelery:
             current_table_conf = kwargs['current_table_conf']
             loader_variant = kwargs['loader_variant']
             loader_conf = kwargs['loader_conf']
+            settings = kwargs['settings']
 
-            extractor = get_extractor(extractor_variant)(current_table_conf)
+            extractor = get_extractor(extractor_variant)(current_table_conf, settings)
             data = extractor.extract()
 
             if data:
@@ -87,6 +91,7 @@ class CoordinatorCelery:
                         'loader_variant': loader_variant,
                         'loader_conf': loader_conf,
                         'data': data,
+                        'settings': settings
                     },
                     priority=201,
                     queue='mkpipe_queue',
@@ -107,9 +112,10 @@ class CoordinatorCelery:
         def load_data(self_task, **kwargs):
             loader_variant = kwargs['loader_variant']
             loader_conf = kwargs['loader_conf']
+            settings = kwargs['settings']
             data = kwargs['data']
 
-            loader = get_loader(loader_variant)(loader_conf)
+            loader = get_loader(loader_variant)(loader_conf, settings)
             elt_start_time = datetime.datetime.now()
             loader.load(data, elt_start_time)
 
@@ -151,6 +157,7 @@ class CoordinatorCelery:
                     current_table_conf=task.current_table_conf,
                     loader_variant=task.loader_variant,
                     loader_conf=task.loader_conf,
+                    settings=task.settings.dict(),
                 ).set(
                     priority=task.priority,
                     queue='mkpipe_queue',

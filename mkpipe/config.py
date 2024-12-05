@@ -1,11 +1,13 @@
 import os
 import yaml
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 
-CONFIG_FILE = None
 TIMEZONE = os.getenv('MKPIPE_PROJECT_TIMEZONE', 'UTC')
-ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_PATH', '/tmp/mkpipe'))
+ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_DIR', '/tmp/mkpipe'))
 ROOT_DIR.mkdir(parents=True, exist_ok=True)
+CONFIG_FILE = str(ROOT_DIR / "mkpipe_project.yaml")
 
 
 def update_globals(config):
