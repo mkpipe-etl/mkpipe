@@ -1,73 +1,86 @@
-# celery --app mkpipe.run_coordinators.coordinator_celery.CoordinatorCelery.app worker --loglevel=info --concurrency=4
+# celery --app mkpipe.run_coordinators.coordinator_celery.app worker --loglevel=info --concurrency=4
+import datetime
+from urllib.parse import quote_plus
+
 from celery import Celery, chord
 from kombu import Queue
-from dotenv import load_dotenv
-import os
-import datetime
+
+from ..config import CONFIG_FILE, get_config_value
 from ..plugins import get_extractor, get_loader
-from urllib.parse import quote_plus
+
+# Determine whether to initialize Celery based on the run_coordinator value
+run_coordinator = get_config_value(["settings", "run_coordinator"], file_name=CONFIG_FILE)
+
+if run_coordinator == 'celery':
+    # Celery app configuration
+    broker_type = get_config_value(['settings', 'broker', 'broker_type'], file_name=CONFIG_FILE)
+    broker_host = get_config_value(['settings', 'broker', 'host'], file_name=CONFIG_FILE)
+    broker_port = get_config_value(['settings', 'broker', 'port'], file_name=CONFIG_FILE)
+    broker_user = get_config_value(['settings', 'broker', 'user'], file_name=CONFIG_FILE)
+    broker_password = get_config_value(['settings', 'broker', 'password'], file_name=CONFIG_FILE)
+
+    CELERY_BROKER_URL = (
+        f'amqp://{broker_user}:{quote_plus(str(broker_password))}@{broker_host}:{broker_port}//'
+    )
+
+    backend_type = get_config_value(['settings', 'backend', 'database_type'], file_name=CONFIG_FILE)
+    backend_host = get_config_value(['settings', 'backend', 'host'], file_name=CONFIG_FILE)
+    backend_port = get_config_value(['settings', 'backend', 'port'], file_name=CONFIG_FILE)
+    backend_user = get_config_value(['settings', 'backend', 'user'], file_name=CONFIG_FILE)
+    backend_password = get_config_value(['settings', 'backend', 'password'], file_name=CONFIG_FILE)
+    backend_database = get_config_value(['settings', 'backend', 'database'], file_name=CONFIG_FILE)
+
+    CELERY_BACKEND_URL = (
+        f"db+{backend_type}://{backend_user}:{quote_plus(str(backend_password))}@{backend_host}:{backend_port}/{backend_database}"
+    )
+
+    # print("CELERY_BROKER_URL:", CELERY_BROKER_URL)
+    # print("CELERY_BACKEND_URL:",CELERY_BACKEND_URL)
+
+    app = Celery('celery_app')
+    app.conf.update(
+        broker_url=CELERY_BROKER_URL,
+        result_backend=CELERY_BACKEND_URL,
+        task_acks_late=True,
+        worker_prefetch_multiplier=1,
+        task_queues=(
+            Queue(
+                'mkpipe_queue',
+                exchange='mkpipe_exchange',
+                routing_key='mkpipe',
+                queue_arguments={'x-max-priority': 255},
+            ),
+        ),
+        task_routes={
+            'elt.celery_app.extract_data': {'queue': 'mkpipe_queue'},
+            'elt.celery_app.load_data': {'queue': 'mkpipe_queue'},
+        },
+        task_default_queue='mkpipe_queue',
+        task_default_exchange='mkpipe_exchange',
+        task_default_routing_key='mkpipe',
+        task_retry_limit=3,
+        task_retry_backoff=True,
+        task_retry_backoff_jitter=True,
+        result_expires=3600,
+        result_chord_retry_interval=60,
+        broker_connection_retry_on_startup=True,
+        worker_direct=True,
+    )
+else:
+    app = None
 
 
 class CoordinatorCelery:
     def __init__(self, task_group, settings):
         self.task_group = task_group
-        self.app = self.initialize_celery()
-        self.register_tasks()
         self.settings = settings
 
-    def initialize_celery(self):
-        # Load environment variables
-        dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-        load_dotenv(dotenv_path)
-
-        # Celery app configuration
-        broker_user = os.getenv('RABBITMQ_DEFAULT_USER', 'guest')
-        broker_pass = os.getenv('RABBITMQ_DEFAULT_PASS', 'guest')
-        broker_host = os.getenv('BROKER_HOST', 'rabbitmq')
-        broker_port = os.getenv('BROKER_PORT', '5672')
-
-        quote_plus(str(self.connection_params['password']))
-        CELERY_BROKER_URL = (
-            f'amqp://{broker_user}:{broker_pass}@{broker_host}:{broker_port}//'
-        )
-        CELERY_BACKEND_URL = os.getenv('CELERY_BACKEND_URL', 'rpc://')
-
-        app = Celery('celery_app')
-        app.conf.update(
-            broker_url=CELERY_BROKER_URL,
-            result_backend=CELERY_BACKEND_URL,
-            task_acks_late=True,
-            worker_prefetch_multiplier=1,
-            task_queues=(
-                Queue(
-                    'mkpipe_queue',
-                    exchange='mkpipe_exchange',
-                    routing_key='mkpipe',
-                    queue_arguments={'x-max-priority': 255},
-                ),
-            ),
-            task_routes={
-                'elt.celery_app.extract_data': {'queue': 'mkpipe_queue'},
-                'elt.celery_app.load_data': {'queue': 'mkpipe_queue'},
-            },
-            task_default_queue='mkpipe_queue',
-            task_default_exchange='mkpipe_exchange',
-            task_default_routing_key='mkpipe',
-            # Retry settings
-            task_retry_limit=3,  # Maximum retries
-            task_retry_backoff=True,  # Enable exponential backoff
-            task_retry_backoff_jitter=True,  # Adds slight randomness
-            result_expires=3600,  # Result expiration time in seconds
-            result_chord_retry_interval=60,
-            broker_connection_retry_on_startup=True,
-            worker_direct=True,
-        )
-        return app
+        if app:
+            self.register_tasks()
 
     def register_tasks(self):
-        """Register tasks dynamically after app initialization."""
-
-        @self.app.task(
+        """Register tasks dynamically for the Celery app."""
+        @app.task(
             bind=True,
             max_retries=3,
             retry_backoff=True,
@@ -91,7 +104,7 @@ class CoordinatorCelery:
                         'loader_variant': loader_variant,
                         'loader_conf': loader_conf,
                         'data': data,
-                        'settings': settings
+                        'settings': settings,
                     },
                     priority=201,
                     queue='mkpipe_queue',
@@ -102,7 +115,7 @@ class CoordinatorCelery:
             print('Extracted data successfully!')
             return True
 
-        @self.app.task(
+        @app.task(
             bind=True,
             max_retries=3,
             retry_backoff=True,
@@ -122,7 +135,7 @@ class CoordinatorCelery:
             print('Loaded data successfully!')
             return True
 
-        @self.app.task
+        @app.task
         def on_all_tasks_completed(results):
             print(f'All tasks completed with results: {results}')
 
@@ -149,6 +162,9 @@ class CoordinatorCelery:
         ).apply_async()
 
     def run(self):
+        if not app:
+            raise RuntimeError("Celery app is not initialized")
+
         celery_task_group = []
         for task in self.task_group:
             celery_task_group.append(
