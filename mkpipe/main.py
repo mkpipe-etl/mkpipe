@@ -120,5 +120,5 @@ def main(config_file_name: str=None, pipeline_name_set=None, table_name_set=None
         logger.log({'warning': 'No tasks were scheduled to run.'})
         return
 
-    coordinator = get_coordinator(run_coordinator)(task_group, settings)
+    coordinator = get_coordinator(run_coordinator)(task_group)
     coordinator.run()

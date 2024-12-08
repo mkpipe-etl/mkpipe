@@ -66,100 +66,94 @@ if run_coordinator == 'celery':
         broker_connection_retry_on_startup=True,
         worker_direct=True,
     )
-else:
-    app = None
 
 
-class CoordinatorCelery:
-    def __init__(self, task_group, settings):
-        self.task_group = task_group
-        self.settings = settings
+    """Register tasks dynamically for the Celery app."""
+    @app.task(
+        bind=True,
+        max_retries=3,
+        retry_backoff=True,
+        retry_backoff_jitter=True,
+        track_started=True,
+    )
+    def extract_data(self_task, **kwargs):
+        extractor_variant = kwargs['extractor_variant']
+        current_table_conf = kwargs['current_table_conf']
+        loader_variant = kwargs['loader_variant']
+        loader_conf = kwargs['loader_conf']
+        settings = kwargs['settings']
 
-        if app:
-            self.register_tasks()
+        extractor = get_extractor(extractor_variant)(current_table_conf, settings)
+        data = extractor.extract()
 
-    def register_tasks(self):
-        """Register tasks dynamically for the Celery app."""
-        @app.task(
-            bind=True,
-            max_retries=3,
-            retry_backoff=True,
-            retry_backoff_jitter=True,
-            track_started=True,
-        )
-        def extract_data(self_task, **kwargs):
-            extractor_variant = kwargs['extractor_variant']
-            current_table_conf = kwargs['current_table_conf']
-            loader_variant = kwargs['loader_variant']
-            loader_conf = kwargs['loader_conf']
-            settings = kwargs['settings']
+        if data:
+            load_data.apply_async(
+                kwargs={
+                    'loader_variant': loader_variant,
+                    'loader_conf': loader_conf,
+                    'data': data,
+                    'settings': settings,
+                },
+                priority=201,
+                queue='mkpipe_queue',
+                exchange='mkpipe_exchange',
+                routing_key='mkpipe',
+            )
 
-            extractor = get_extractor(extractor_variant)(current_table_conf, settings)
-            data = extractor.extract()
+        print('Extracted data successfully!')
+        return True
 
-            if data:
-                self_task.request.app.send_task(
-                    'load_data',
-                    kwargs={
-                        'loader_variant': loader_variant,
-                        'loader_conf': loader_conf,
-                        'data': data,
-                        'settings': settings,
-                    },
-                    priority=201,
-                    queue='mkpipe_queue',
-                    exchange='mkpipe_exchange',
-                    routing_key='mkpipe',
-                )
+    @app.task(
+        bind=True,
+        max_retries=3,
+        retry_backoff=True,
+        retry_backoff_jitter=True,
+        track_started=True,
+    )
+    def load_data(self_task, **kwargs):
+        loader_variant = kwargs['loader_variant']
+        loader_conf = kwargs['loader_conf']
+        settings = kwargs['settings']
+        data = kwargs['data']
 
-            print('Extracted data successfully!')
-            return True
+        loader = get_loader(loader_variant)(loader_conf, settings)
+        elt_start_time = datetime.datetime.now()
+        loader.load(data, elt_start_time)
 
-        @app.task(
-            bind=True,
-            max_retries=3,
-            retry_backoff=True,
-            retry_backoff_jitter=True,
-            track_started=True,
-        )
-        def load_data(self_task, **kwargs):
-            loader_variant = kwargs['loader_variant']
-            loader_conf = kwargs['loader_conf']
-            settings = kwargs['settings']
-            data = kwargs['data']
+        print('Loaded data successfully!')
+        return True
 
-            loader = get_loader(loader_variant)(loader_conf, settings)
-            elt_start_time = datetime.datetime.now()
-            loader.load(data, elt_start_time)
+    @app.task
+    def on_all_tasks_completed(results):
+        print(f'All tasks completed with results: {results}')
 
-            print('Loaded data successfully!')
-            return True
+        if all(results):
+            print('Both extraction and loading tasks succeeded.')
+        else:
+            print('One or more tasks failed. DBT not triggered.')
 
-        @app.task
-        def on_all_tasks_completed(results):
-            print(f'All tasks completed with results: {results}')
+        return 'All tasks completed!' if all(results) else 'Some tasks failed!'
 
-            if all(results):
-                print('Both extraction and loading tasks succeeded.')
-            else:
-                print('One or more tasks failed. DBT not triggered.')
 
-            return 'All tasks completed!' if all(results) else 'Some tasks failed!'
-
-        # Assign tasks to the class instance
-        self.extract_data = extract_data
-        self.load_data = load_data
-        self.on_all_tasks_completed = on_all_tasks_completed
-
-    def run_parallel_tasks(self, task_group):
+    def run_parallel_tasks(task_group):
         chord(
             task_group,
-            body=self.on_all_tasks_completed.s().set(
+            body=on_all_tasks_completed.s().set(
                 queue='mkpipe_queue',
                 exchange='mkpipe_exchange',
                 routing_key='mkpipe',
             ),
         ).apply_async()
+
+
+
+else:
+    app = None
+
+
+class CoordinatorCelery:
+    def __init__(self, task_group):
+        self.task_group = task_group
 
     def run(self):
         if not app:
@@ -168,7 +162,7 @@ class CoordinatorCelery:
         celery_task_group = []
         for task in self.task_group:
             celery_task_group.append(
-                self.extract_data.s(
+                extract_data.s(
                     extractor_variant=task.extractor_variant,
                     current_table_conf=task.current_table_conf,
                     loader_variant=task.loader_variant,
@@ -183,4 +177,4 @@ class CoordinatorCelery:
             )
 
         if celery_task_group:
-            self.run_parallel_tasks(celery_task_group)
+            run_parallel_tasks(celery_task_group)

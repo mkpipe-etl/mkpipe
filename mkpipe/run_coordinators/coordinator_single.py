@@ -3,9 +3,8 @@ from ..plugins import get_extractor, get_loader
 
 
 class CoordinatorSingle:
-    def __init__(self, task_group, settings):
+    def __init__(self, task_group):
         self.task_group = task_group
-        self.settings = settings
 
     def load_data(self, task):
         # Initialize loader instance
