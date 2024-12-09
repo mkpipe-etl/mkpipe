@@ -22,7 +22,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
     if not config_file_name:
         config_file_name = CONFIG_FILE
     logger = Logger(config_file_name)
-    logger.log({'file_name': config_file_name})
+    logger.info({'file_name': config_file_name})
 
     DATA = load_config(config_file=config_file_name)
 
@@ -57,7 +57,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
         load_task = job['load_task']
         custom_priority = job.get('priority', None)
 
-        print(f'Running pipeline: {pipeline_name}')
+        logger.info({'message': f'Running pipeline: {pipeline_name}'})
 
         # Loader Configuration
         try:
@@ -67,7 +67,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
             loader_conf['connection_params'] = connection_params
 
         except KeyError as e:
-            logger.log(
+            logger.info(
                 {
                     'error': f'Loader configuration issue: {str(e)}',
                     'loader_task': load_task,
@@ -82,7 +82,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
             connection_params = DATA['connections'][extractor_conf['connection_ref']]
             extractor_conf['connection_params'] = connection_params
         except KeyError as e:
-            logger.log(
+            logger.info(
                 {
                     'error': f'Extractor configuration issue: {str(e)}',
                     'extract_task': extract_task,
@@ -117,7 +117,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
             task_group.append(task)
 
     if not task_group:
-        logger.log({'warning': 'No tasks were scheduled to run.'})
+        logger.info({'warning': 'No tasks were scheduled to run.'})
         return
 
     coordinator = get_coordinator(run_coordinator)(task_group)

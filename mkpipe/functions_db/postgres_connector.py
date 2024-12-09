@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 from functools import wraps
 from .register_db import register_db_connector, get_db_connector
 from ..config import load_config
+from ..utils import Logger
+
+logger = Logger(__file__)
 
 
 @register_db_connector('postgresql')
@@ -48,12 +51,16 @@ def retry_on_failure(max_attempts=5, delay=1):
                 except Exception as e:
                     attempts += 1
                     if attempts < max_attempts:
-                        print(
-                            f'Attempt {attempts} failed: {e}. Retrying in {delay} seconds...'
+                        logger.info(
+                            {
+                                'message': f'Attempt {attempts} failed: {e}. Retrying in {delay} seconds...'
+                            }
                         )
                         time.sleep(delay)
                     else:
-                        print(f'Error after {max_attempts} attempts: {e}')
+                        logger.error(
+                            {'message': f'Error after {max_attempts} attempts: {e}'}
+                        )
                         raise e
 
         return wrapper

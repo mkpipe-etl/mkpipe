@@ -7,6 +7,9 @@ from kombu import Queue
 
 from ..config import CONFIG_FILE, get_config_value
 from ..plugins import get_extractor, get_loader
+from ..utils import Logger
+
+logger = Logger(__file__)
 
 # Determine whether to initialize Celery based on the run_coordinator value
 run_coordinator = get_config_value(
@@ -120,7 +123,7 @@ if run_coordinator == 'celery':
                 routing_key='mkpipe',
             )
 
-        print('Extracted data successfully!')
+        logger.info({'message': 'Extracted data successfully!'})
         return True
 
     @app.task(
@@ -140,17 +143,17 @@ if run_coordinator == 'celery':
         elt_start_time = datetime.datetime.now()
         loader.load(data, elt_start_time)
 
-        print('Loaded data successfully!')
+        logger.info({'message': 'Loaded data successfully!'})
         return True
 
     @app.task
     def on_all_tasks_completed(results):
-        print(f'All tasks completed with results: {results}')
+        logger.info({'message': f'All tasks completed with results: {results}'})
 
         if all(results):
-            print('Both extraction and loading tasks succeeded.')
+            logger.info({'message': 'Both extraction and loading tasks succeeded.'})
         else:
-            print('One or more tasks failed. DBT not triggered.')
+            logger.warning({'message': 'One or more tasks failed. DBT not triggered.'})
 
         return 'All tasks completed!' if all(results) else 'Some tasks failed!'
 
@@ -196,4 +199,4 @@ class CoordinatorCelery:
 
         if celery_task_group:
             run_parallel_tasks(celery_task_group)
-            print('Tasks have been sended to the Celery Queue!')
+            logger.info({'message': 'Tasks have been sended to the Celery Queue!'})

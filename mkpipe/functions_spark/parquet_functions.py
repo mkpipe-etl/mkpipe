@@ -5,6 +5,9 @@ from pyspark.sql.types import StructType
 from pyspark.sql import SparkSession
 from pyspark import SparkConf
 from ..config import ROOT_DIR
+from ..utils import Logger
+
+logger = Logger(__file__)
 
 
 def create_spark_session(settings):
@@ -56,11 +59,15 @@ def remove_partitioned_parquet(directory_path):
         if os.path.exists(directory_path) and os.path.isdir(directory_path):
             # Remove the entire directory tree
             shutil.rmtree(directory_path)
-            print(f'Partitioned Parquet files deleted from {directory_path}')
+            logger.info(
+                {'message': f'Partitioned Parquet files deleted from {directory_path}'}
+            )
         else:
-            print(f'The directory {directory_path} does not exist.')
+            logger.warning(
+                {'message': f'The directory {directory_path} does not exist.'}
+            )
     except Exception as e:
-        print(f'Error deleting partitioned Parquet files: {e}')
+        logger.error({'message': f'Error deleting partitioned Parquet files: {e}'})
 
 
 def write_schema(schema, table_name):

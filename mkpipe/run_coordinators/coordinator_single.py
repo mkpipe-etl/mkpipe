@@ -1,5 +1,8 @@
 import datetime
 from ..plugins import get_extractor, get_loader
+from ..utils import Logger
+
+logger = Logger(__file__)
 
 
 class CoordinatorSingle:
@@ -16,7 +19,7 @@ class CoordinatorSingle:
         # Load the extracted data with the start time
         loader.load(task.data, elt_start_time)
 
-        print('Loaded data successfully!')
+        logger.info({'message': 'Loaded data successfully!'})
         return True  # Return True to indicate success
 
     def extract_data(self, task):
@@ -27,8 +30,7 @@ class CoordinatorSingle:
 
         # Perform the data extraction
         task.data = extractor.extract()
-        print('Extracted data successfully!')
-        print(task.data)
+        logger.info({'message': 'Extracted data successfully!'})
 
         if task.data:
             # Schedule the data loading as a separate task
