@@ -70,3 +70,30 @@ For more detailed documentation, please visit the [GitHub repository](https://gi
 ## License
 
 This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+
+
+# Db Support Plan  
+## Core Relational Databases  
+- [x]  PostgreSQL
+- [ ]  MySQL/MariaDB
+- [ ]  SQL Server
+- [ ]  Oracle Database
+- [ ]  SQLite
+- [ ]  Snowflake
+- [ ]  Google BigQuery
+- [ ]  Amazon Redshift
+- [ ]  ClickHouse
+- [ ]  Amazon S3
+
+---
+## NoSQL Databases  
+- [ ]  MongoDB
+- [ ]  Cassandra
+- [ ]  DynamoDB
+- [ ]  Redis
+- [ ]  Azure Data Lake Storage (ADLS)
+- [ ]  Google Cloud Storage
+- [ ]  Elasticsearch
+- [ ]  TimescaleDB
+- [ ]  HDFS
+- [ ]  InfluxDB
