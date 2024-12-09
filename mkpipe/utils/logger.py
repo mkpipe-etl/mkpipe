@@ -100,52 +100,52 @@ class Logger:
         logger = self.logger
         if log_level == 'debug':
             logger.debug(msg)
-            self.dagster_logger.debug(msg)
+            # self.dagster_logger.debug(msg)
         elif log_level == 'info':
             logger.info(msg)
-            self.dagster_logger.info(msg)
+            # self.dagster_logger.info(msg)
         elif log_level == 'warning':
             logger.warning(msg)
-            self.dagster_logger.warning(msg)
+            # self.dagster_logger.warning(msg)
         elif log_level == 'error':
             logger.error(msg)
-            self.dagster_logger.error(msg)
+            # self.dagster_logger.error(msg)
         elif log_level == 'critical':
             logger.critical(msg)
-            self.dagster_logger.critical(msg)
+            # self.dagster_logger.critical(msg)
         else:
             logger.exception(msg)
-            self.dagster_logger.exception(msg)
+            # self.dagster_logger.exception(msg)
         return
 
     def debug(self, message):
         msg = self.message_formatter(message)
         self.logger.debug(msg)
-        self.dagster_logger.debug(msg)
+        # self.dagster_logger.debug(msg)
         return
 
     def info(self, message):
         msg = self.message_formatter(message)
         self.logger.info(msg)
-        self.dagster_logger.info(msg)
+        # self.dagster_logger.info(msg)
         return
 
     def warning(self, message):
         msg = self.message_formatter(message)
         self.logger.warning(msg)
-        self.dagster_logger.warning(msg)
+        # self.dagster_logger.warning(msg)
         return
 
     def error(self, message):
         msg = self.message_formatter(message)
         self.logger.error(msg)
-        self.dagster_logger.error(msg)
+        # self.dagster_logger.error(msg)
         return
 
     def critical(self, message):
         msg = self.message_formatter(message)
         self.logger.critical(msg)
-        self.dagster_logger.critical(msg)
+        # self.dagster_logger.critical(msg)
         return
 
     def shutdown(self):

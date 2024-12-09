@@ -8,14 +8,18 @@ setup(
     install_requires=[
         'psycopg2-binary>=2.9.10',
         'pyspark>=3.5.3',
-        'celery>=5.4.0',
-        'kombu>=5.4.2',
         'pydantic>=2.10.3',
         'PyYAML>=6.0.2',
         'python-dotenv>=1.0.1',
+        'celery>=5.4.0',
+        'kombu>=5.4.2',
+        'sqlalchemy>=2.0.36',
     ],
     include_package_data=True,
     entry_points={
+        'console_scripts': [
+            'mkpipe=mkpipe.main:cli',
+        ],
         'mkpipe.extractors': [],
         'mkpipe.loaders': [],
         'mkpipe.transformers': [],

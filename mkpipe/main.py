@@ -1,124 +1,36 @@
+import click
 import os
-import time
-from .config import load_config, get_config_value, TIMEZONE, ROOT_DIR, CONFIG_FILE
-from .run_coordinators import get_coordinator
-
-from .utils import Logger, InputTask, PipeSettings
-
-os.environ['TZ'] = TIMEZONE
-time.tzset()
+from .run import main
 
 
-# Function to manage priority levels and reset if necessary
-def get_priority(pipeline_name, priority, custom_priority):
-    """Adjust priority based on pipeline name or reset if necessary."""
-    if custom_priority:
-        return custom_priority
-    priority -= 1
-    return 200 if priority < 1 else priority
+@click.group(help='mkpipe CLI: A command-line interface for the mkpipe ETL framework.')
+def cli():
+    """CLI for mkpipe ETL framework."""
+    pass
 
 
-def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=None):
-    if not config_file_name:
-        config_file_name = CONFIG_FILE
-    logger = Logger(config_file_name)
-    logger.log({'file_name': config_file_name})
-
-    DATA = load_config(config_file=config_file_name)
-
-    settings_values = get_config_value(['settings'], file_name=config_file_name)
-    settings = PipeSettings(ROOT_DIR=str(ROOT_DIR), **settings_values)
-    run_coordinator = get_config_value(
-        ['settings', 'run_coordinator'], file_name=config_file_name
+@cli.command(help='Run the mkpipe pipeline with the specified configuration file.')
+@click.option(
+    '--config',
+    default=None,
+    help='Path to the configuration file. Overrides MKPIPE_PROJECT_DIR.',
+)
+def run(config):
+    """Run the mkpipe pipeline."""
+    config_file = config or os.path.join(
+        os.getenv('MKPIPE_PROJECT_DIR', '.'), 'mkpipe_project.yaml'
     )
-
-    # Validate that pipeline_name_set and table_name_set are sets
-    if pipeline_name_set and not isinstance(pipeline_name_set, set):
-        raise TypeError('pipeline_name_set must be a set')
-    if table_name_set and not isinstance(table_name_set, set):
-        raise TypeError('table_name_set must be a set')
-
-    jobs = DATA['jobs']
-
-    # Filter jobs based on pipeline_name_set if provided
-    if pipeline_name_set:
-        jobs = [job for job in jobs if job['name'] in pipeline_name_set]
-
-    # Initialize the priority counter starting from 200
-    priority = 200
-
-    # Create a list to hold all tasks for the chord
-    task_group = []
-
-    # Iterate over the filtered jobs
-    for job in jobs:
-        pipeline_name = job['name']
-        extract_task = job['extract_task']
-        load_task = job['load_task']
-        custom_priority = job.get('priority', None)
-
-        print(f'Running pipeline: {pipeline_name}')
-
-        # Loader Configuration
-        try:
-            loader_conf = DATA['loaders'][load_task]['config']
-            loader_variant = DATA['loaders'][load_task]['variant']
-            connection_params = DATA['connections'][loader_conf['connection_ref']]
-            loader_conf['connection_params'] = connection_params
-
-        except KeyError as e:
-            logger.log(
-                {
-                    'error': f'Loader configuration issue: {str(e)}',
-                    'loader_task': load_task,
-                }
-            )
-            continue  # Skip this job if there is an error
-
-        # Extractor Configuration
-        try:
-            extractor_conf = DATA['extractors'][extract_task]['config']
-            extractor_variant = DATA['extractors'][extract_task]['variant']
-            connection_params = DATA['connections'][extractor_conf['connection_ref']]
-            extractor_conf['connection_params'] = connection_params
-        except KeyError as e:
-            logger.log(
-                {
-                    'error': f'Extractor configuration issue: {str(e)}',
-                    'extract_task': extract_task,
-                }
-            )
-            continue  # Skip this job if there is an error
-
-        # Loop through each table in the extractor's configuration
-        for table in extractor_conf.get('tables', []):
-            # Skip this table if it's not in the provided set
-            if table_name_set and table['name'] not in table_name_set:
-                continue
-
-            # Copy the extractor config for the current table
-            current_table_conf = extractor_conf.copy()
-            current_table_conf['table'] = table  # Add the specific table
-            current_table_conf.pop('tables', None)
-
-            # Get the adjusted priority level for the current pipeline
-            priority = get_priority(pipeline_name, priority, custom_priority)
-
-            task = InputTask(
-                extractor_variant=extractor_variant,
-                current_table_conf=current_table_conf,
-                loader_variant=loader_variant,
-                loader_conf=loader_conf,
-                priority=custom_priority,
-                settings=settings,
-            )
-
-            # Add the extraction task to the chord group, using kwargs
-            task_group.append(task)
-
-    if not task_group:
-        logger.log({'warning': 'No tasks were scheduled to run.'})
+    if not os.path.exists(config_file):
+        click.echo(f'Error: Configuration file not found: {config_file}')
+        click.echo(
+            'Set the MKPIPE_PROJECT_DIR environment variable or use the --config option.'
+        )
         return
 
-    coordinator = get_coordinator(run_coordinator)(task_group)
-    coordinator.run()
+    click.echo(f'Running mkpipe pipeline with configuration: {config_file}')
+    os.chdir(os.path.dirname(config_file))
+    main(config_file)
+
+
+if __name__ == '__main__':
+    cli()
