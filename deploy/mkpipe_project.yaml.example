@@ -1,0 +1,69 @@
+version: 1
+default_environment: prod
+project_id: 7a30229a-4a52-4915-8d84-a434da1d597a
+prod:
+
+  settings:
+    run_coordinator: single
+    timezone: 'UTC'
+    partitions_count: 2
+    spark_driver_memory: '4g'
+    spark_executor_memory: '3g'
+    default_iterate_max_loop: 1000
+    default_iterate_batch_size: 500000
+
+    broker:
+      broker_type: rabbitmq
+      user: guest 
+      password: guest
+      host: 0.0.0.0
+      port: 5672
+    backend:
+      database_type: postgresql
+      host: 0.0.0.0
+      port: 5432
+      database: postgres
+      schema: public
+      user: postgres
+      password: postgres
+
+  connections:
+    destination_dwh_postgres:
+      host: localhost
+      port: 5432
+      database: postgres
+      schema: public
+      user: postgres
+      password: postgres
+    source_pfmegrnargs_postgresql:
+      host: hh-pgsql-public.ebi.ac.uk
+      port: 5432
+      database: pfmegrnargs
+      schema: rnacen
+      user: reader
+      password: NWDMCE5xdipIjRrp
+
+  extractors:
+    extract_pfmegrnargs_data:
+      description: null
+      variant: postgresql
+      config:
+        connection_ref: source_pfmegrnargs_postgresql
+        tables:
+          - iterate_column_type: int
+            name: rnc_database
+            partitions_column: id
+            replication_method: incremental
+            target_name: raw_rnc_database3
+
+  loaders:
+    load_to_stage:
+      config:
+        connection_ref: destination_dwh_postgres
+      variant: postgresql
+
+  jobs:
+    - name: pfmegrnargs 
+      extract_task: extract_pfmegrnargs_data
+      load_task: load_to_stage
+      priority: 1

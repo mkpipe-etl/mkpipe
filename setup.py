@@ -4,7 +4,7 @@ setup(
     name='mkpipe',
     version='0.1.12',
     license='Apache License 2.0',
-    packages=find_packages(exclude=['tests', 'scripts']),
+    packages=find_packages(exclude=['tests', 'scripts', 'deploy']),
     install_requires=[],
     include_package_data=True,
     entry_points={

@@ -1,0 +1,27 @@
+services :
+  db:
+    image: postgres
+    container_name: pg_container
+    restart: unless-stopped
+    ports:
+      - "${PGPORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
+      POSTGRES_DB: ${PGDB:-postgres}
+    volumes:
+      - ${POSTGRES_DATA-./postgres_data}:/var/lib/postgresql/data/:rw # <-- this is for bind volume
+      # - ./dbscripts:/docker-entrypoint-initdb.d
+
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "${RABBITMQ_PORT_MANAGEMENT:-15672}:15672"
+      - "${RABBITMQ_PORT_AMQP:-5672}:5672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - ${RABBITMQ_DATA-./rabbitmq_data}:/var/lib/rabbitmq:rw

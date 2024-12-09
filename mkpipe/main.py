@@ -18,9 +18,9 @@ def get_priority(pipeline_name, priority, custom_priority):
     return 200 if priority < 1 else priority
 
 
-def main(config_file_name: str=None, pipeline_name_set=None, table_name_set=None):
+def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=None):
     if not config_file_name:
-        config_file_name = CONFIG_FILE 
+        config_file_name = CONFIG_FILE
     logger = Logger(config_file_name)
     logger.log({'file_name': config_file_name})
 
