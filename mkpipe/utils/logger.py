@@ -4,8 +4,9 @@ import os
 import logging
 import time
 import logging.handlers
-from dagster import get_dagster_logger
 from ..config import ROOT_DIR
+
+# from dagster import get_dagster_logger
 
 path = os.path.abspath(os.path.join(ROOT_DIR, 'logs'))
 # path = ROOT_DIR / "logs"
@@ -36,7 +37,7 @@ class Logger:
         logger.error("This is an error message")
         """
         self.logger = logging.getLogger(name)
-        self.dagster_logger = get_dagster_logger()
+        # self.dagster_logger = get_dagster_logger()
         if not self.logger.handlers:
             # create the handlers and call logger.addHandler(logging_handler)
             self.logger = logging.getLogger(name)

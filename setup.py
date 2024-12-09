@@ -5,7 +5,15 @@ setup(
     version='0.1.12',
     license='Apache License 2.0',
     packages=find_packages(exclude=['tests', 'scripts', 'deploy']),
-    install_requires=[],
+    install_requires=[
+        'psycopg2-binary>=2.9.10',
+        'pyspark>=3.5.3',
+        'celery>=5.4.0',
+        'kombu>=5.4.2',
+        'pydantic>=2.10.3',
+        'PyYAML>=6.0.2',
+        'python-dotenv>=1.0.1',
+    ],
     include_package_data=True,
     entry_points={
         'mkpipe.extractors': [],
