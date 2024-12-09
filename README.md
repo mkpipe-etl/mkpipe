@@ -21,10 +21,10 @@ This method sets up all required services automatically using Docker Compose.
 
 #### Steps:
 
-1. Clone or copy the `deploy` folder from the repository.
+1. Clone or copy the [deploy](./deploy/) folder from the repository.
 2. Modify the configuration files:
-   - `.env` for environment variables.
-   - `mkpipe_project.yaml` for your specific ETL configurations.
+   - [.env](./deploy/.env.example) for environment variables.
+   - [mkpipe_project.yaml](./deploy/mkpipe_project.yaml.example) for your specific ETL configurations.
 3. Run the following command to start the services:
    ```bash
    docker-compose up --build
