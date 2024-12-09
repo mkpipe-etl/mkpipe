@@ -31,11 +31,11 @@ This method sets up all required services automatically using Docker Compose.
    ```
    This will set up the following services:
    - PostgreSQL: Required for data storage.
-   - RabbitMQ: Required for the Celery `run_coordinator=celery`.
-   - Celery Worker: Required for running the Celery `run_coordinator=celery`.
+   - RabbitMQ: Required for the Celery [`run_coordinator=celery`](./deploy/mkpipe_project.yaml.example#L7).
+   - Celery Worker: Required for running the Celery [`run_coordinator=celery`](./deploy/mkpipe_project.yaml.example#L7).
    - Flower UI: Optional, but required for monitoring Celery tasks.
 
-   **Note:** If you only want to use the `run_coordinator=single` without Celery, only PostgreSQL is necessary.
+   **Note:** If you only want to use the [`run_coordinator=single`](./deploy/mkpipe_project.yaml.example#L7)without Celery, only PostgreSQL is necessary.
 
 ### 2. Running Locally
 
