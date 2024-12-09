@@ -1,7 +1,5 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-artifacts/
-logs/
 postgres_data/
 rabbitmq_data/
 *.py[cod]

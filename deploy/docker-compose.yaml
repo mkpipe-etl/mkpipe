@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres
-    container_name: pg_container
+    container_name: db 
     restart: unless-stopped
     ports:
       - "${PGPORT:-5432}:5432"
@@ -33,36 +33,45 @@ services:
     container_name: celery_worker
     # restart: unless-stopped
     depends_on:
-      - rabbitmq
       - db
+      - rabbitmq
     environment:
       - MKPIPE_PROJECT_DIR=/app
+    volumes:
+      - ./artifacts:/app/artifacts:rw
+      - ./logs:/app/logs:rw
     command: sh -c "./celery.sh"
 
-  # flower:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: flower_ui
-  #   # restart: unless-stopped
-  #   depends_on:
-  #     - rabbitmq
-  #     - db
-  #   environment:
-  #     - MKPIPE_PROJECT_DIR=/app
-  #     - RABBITMQ_HOST=${RABBITMQ_HOST:-localhost}
-  #   command: sh -c "./flower.sh"
-  #   ports:
-  #     - "${FLOWER_PORT:-5555}:5555"
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flower_ui
+    restart: unless-stopped
+    depends_on:
+      - db
+      - rabbitmq
+    environment:
+      - MKPIPE_PROJECT_DIR=/app
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-localhost}
+    command: sh -c "./flower.sh"
+    ports:
+      - "${FLOWER_PORT:-5555}:5555"
 
-  # mkpipe:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: mkpipe_service
-  #   restart: unless-stopped
-  #   environment:
-  #     - MKPIPE_PROJECT_DIR=/app
-  #   command: >
-  #     sh -c "python -c 'import os; from mkpipe import run; os.chdir(os.getenv(\"MKPIPE_PROJECT_DIR\")); run()'"
+  mkpipe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mkpipe_service
+    depends_on:
+      - db
+      - rabbitmq
+      - celery_worker
+    environment:
+      - MKPIPE_PROJECT_DIR=/app
+    volumes:
+      - ./artifacts:/app/artifacts:rw
+      - ./logs:/app/logs:rw
+    command: >
+      sh -c "mkpipe run"
 
