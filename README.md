@@ -72,7 +72,10 @@ For more detailed documentation, please visit the [GitHub repository](https://gi
 This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
 
-# Db Support Plan  
+# Db Support Plan 
+
+**Please see our [mkpipe-hub](https://github.com/m-karakus/mkpipe-hub) repository for supported plugins!**
+
 ## Core Relational Databases  
 - [x]  PostgreSQL
 - [ ]  MySQL/MariaDB
