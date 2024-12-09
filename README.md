@@ -74,7 +74,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 
 # Db Support Plan 
 
-**Please see our [mkpipe-hub](https://github.com/m-karakus/mkpipe-hub) repository for supported plugins!**
+**For actively supported databases/plugins, please visit the [MkPipe-hub repository!](https://github.com/m-karakus/mkpipe-hub)**
 
 ## Core Relational Databases  
 - [x]  PostgreSQL
