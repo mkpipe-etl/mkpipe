@@ -4,7 +4,7 @@ project_id: 7a30229a-4a52-4915-8d84-a434da1d597a
 prod:
 
   settings:
-    run_coordinator: single
+    run_coordinator: celery 
     timezone: 'UTC'
     partitions_count: 2
     spark_driver_memory: '4g'
@@ -16,11 +16,11 @@ prod:
       broker_type: rabbitmq
       user: guest 
       password: guest
-      host: 0.0.0.0
+      host: rabbitmq
       port: 5672
     backend:
       database_type: postgresql
-      host: 0.0.0.0
+      host: db 
       port: 5432
       database: postgres
       schema: public
@@ -29,7 +29,7 @@ prod:
 
   connections:
     destination_dwh_postgres:
-      host: localhost
+      host: db
       port: 5432
       database: postgres
       schema: public
