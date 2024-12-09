@@ -84,7 +84,6 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 - [ ]  Amazon Redshift
 - [ ]  ClickHouse
 - [ ]  Amazon S3
-
 ---
 ## NoSQL Databases  
 - [ ]  MongoDB
@@ -97,3 +96,100 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 - [ ]  TimescaleDB
 - [ ]  HDFS
 - [ ]  InfluxDB
+---
+## ERP/CRM Systems
+- [ ]  Salesforce  
+- [ ]  SAP  
+- [ ]  Microsoft Dynamics  
+- [ ]  NetSuite  
+- [ ]  Workday  
+- [ ]  HubSpot  
+- [ ]  Zoho CRM  
+- [ ]  Freshsales  
+- [ ]  Zendesk  
+- [ ]  Oracle NetSuite  
+---
+## Emerging Databases & Analytical Tools
+Apache Druid  
+- [ ]  Vertica  
+- [ ]  SingleStore (MemSQL)  
+- [ ]  Exasol  
+- [ ]  SAP HANA  
+- [ ]  IBM Db2  
+- [ ]  Neo4j (Graph Database)  
+- [ ]  Greenplum  
+- [ ]  CockroachDB  
+- [ ]  AWS Athena  
+---
+## Streaming Systems
+- [ ]  Kafka  
+- [ ]  RabbitMQ  
+- [ ]  Pulsar  
+- [ ]  Apache Flink  
+- [ ]  Amazon Kinesis  
+- [ ]  Google Pub/Sub  
+- [ ]  Azure Event Hubs  
+- [ ]  Apache NiFi  
+- [ ]  ActiveMQ  
+- [ ]  Redpanda  
+---
+## File Formats & Data Lakes
+- [ ]  Parquet  
+- [ ]  Avro  
+- [ ]  JSON  
+- [ ]  CSV  
+- [ ]  XML  
+- [ ]  ORC  
+- [ ]  Google Drive (for raw files)  
+- [ ]  Dropbox  
+- [ ]  Box  
+- [ ]  FTP/SFTP Servers  
+---
+## Specialized Analytics Tools
+- [ ]  Metabase (Data Visualization)  
+- [ ]  Tableau Data Extracts  
+- [ ]  Power BI  
+- [ ]  Looker  
+- [ ]  Google Analytics (GA4)  
+- [ ]  Mixpanel  
+- [ ]  Amplitude  
+- [ ]  Adobe Analytics  
+- [ ]  Heap  
+- [ ]  Klipfolio  
+---
+## Industry-Specific Databases
+- [ ]  Aerospike  
+- [ ]  RocksDB  
+- [ ]  FaunaDB  
+- [ ]  ScyllaDB  
+- [ ]  ArangoDB  
+- [ ]  MarkLogic  
+- [ ]  CrateDB  
+- [ ]  TigerGraph  
+- [ ]  HarperDB  
+- [ ]  SAP ASE (Sybase)  
+---
+## Legacy Databases
+- [ ]  Teradata  
+- [ ]  Netezza  
+- [ ]  Informix  
+- [ ]  Ingres  
+- [ ]  Firebird  
+- [ ]  Progress OpenEdge  
+- [ ]  ParAccel  
+- [ ]  MaxDB  
+- [ ]  HP Vertica  
+- [ ]  Sybase IQ  
+---
+## Emerging Cloud & Hybrid Databases
+- [ ]  PlanetScale (MySQL-based)  
+- [ ]  YugabyteDB  
+- [ ]  TiDB  
+- [ ]  OceanBase  
+- [ ]  Citus (PostgreSQL-based)  
+- [ ]  Snowplow Analytics  
+- [ ]  Spanner (Google Cloud)  
+- [ ]  MariaDB ColumnStore  
+- [ ]  CockroachDB Serverless
+- [ ]  Weaviate (Vector Search)  
+---
