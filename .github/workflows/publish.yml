@@ -74,9 +74,14 @@ jobs:
         run: |
           REPO_NAME=$(basename ${{ github.repository }})
           IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/$REPO_NAME
-          TAG_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
-          docker build -t $IMAGE_NAME:$TAG_NAME ./deploy
-          echo "image=$IMAGE_NAME:$TAG_NAME" >> $GITHUB_ENV
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          # Build with version tag and latest tag
+          docker build -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest ./deploy
+          echo "image=$IMAGE_NAME:$VERSION" >> $GITHUB_ENV
+          echo "image_latest=$IMAGE_NAME:latest" >> $GITHUB_ENV
 
       - name: Push Docker Image
-        run: docker push ${{ env.image }}
+        run: |
+          docker push ${{ env.image }}
+          docker push ${{ env.image_latest }}
