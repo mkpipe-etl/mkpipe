@@ -11,16 +11,18 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-17-jdk \
     bash \
+    cron \
     libsnappy-java \
     libsnappy1v5 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-
+    
 # Install mkpipe components
 RUN pip install --upgrade pip && \
     pip install mkpipe-extractor-postgres mkpipe-loader-postgres flower --no-cache-dir
 
 # Copy the remaining files into the image
-COPY celery.sh flower.sh /app
+COPY celery.sh /app/celery.sh
+COPY flower.sh /app/flower.sh
 
 # Set environment variable for mkpipe project directory
 ENV MKPIPE_PROJECT_DIR=/app

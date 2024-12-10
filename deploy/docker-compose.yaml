@@ -51,7 +51,7 @@ services:
     #   dockerfile: Dockerfile
     image: ghcr.io/m-karakus/mkpipe:latest
     container_name: flower_ui
-    # restart: unless-stopped
+    restart: unless-stopped
     depends_on:
       - db
       - rabbitmq
@@ -82,6 +82,6 @@ services:
       - ./logs:/app/logs:rw
       - ./.env:/app/.env:ro
       - ./mkpipe_project.yaml:/app/mkpipe_project.yaml:ro
+      - ./mkpipe-cron:/etc/cron.d/mkpipe-cron:ro  # Mount the crontab file for scheduling
     command: >
-      sh -c "mkpipe run"
-
+      sh -c "mkpipe run && cron && tail -f /var/log/mkpipe.log"

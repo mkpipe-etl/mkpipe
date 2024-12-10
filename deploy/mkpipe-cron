@@ -1,0 +1,2 @@
+0 * * * * mkpipe run >> /var/log/mkpipe.log 2>&1    # Run mkpipe every hour
+*/5 * * * * mkpipe run >> /var/log/mkpipe.log 2>&1  # Run mkpipe every 5 mins
