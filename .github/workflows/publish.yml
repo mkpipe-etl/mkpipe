@@ -9,12 +9,8 @@ jobs:
   build-and-push-pypi:
     name: Build PyPI Package and Push
     runs-on: ubuntu-latest
-
     permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -53,8 +49,12 @@ jobs:
     name: Docker Image Build and Push
     runs-on: ubuntu-latest
     needs: [build-and-push-pypi]
+
     permissions:
       contents: write
+      packages: write
+      attestations: write
+      id-token: write
 
     steps:
       - name: Checkout Repository
