@@ -40,6 +40,8 @@ services:
     volumes:
       - ./artifacts:/app/artifacts:rw
       - ./logs:/app/logs:rw
+      - ./.env:/app/.env:ro
+      - ./mkpipe_project.yaml:/app/mkpipe_project.yaml:ro
     command: sh -c "./celery.sh"
 
   flower:
@@ -54,6 +56,9 @@ services:
     environment:
       - MKPIPE_PROJECT_DIR=/app
       - RABBITMQ_HOST=${RABBITMQ_HOST:-localhost}
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./mkpipe_project.yaml:/app/mkpipe_project.yaml:ro
     command: sh -c "./flower.sh"
     ports:
       - "${FLOWER_PORT:-5555}:5555"
@@ -72,6 +77,8 @@ services:
     volumes:
       - ./artifacts:/app/artifacts:rw
       - ./logs:/app/logs:rw
+      - ./.env:/app/.env:ro
+      - ./mkpipe_project.yaml:/app/mkpipe_project.yaml:ro
     command: >
       sh -c "mkpipe run"
 
