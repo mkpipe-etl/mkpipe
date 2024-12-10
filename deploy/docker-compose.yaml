@@ -27,9 +27,10 @@ services:
       - ${RABBITMQ_DATA:-./rabbitmq_data}:/var/lib/rabbitmq:rw
 
   celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: ghcr.io/m-karakus/mkpipe:latest
     container_name: celery_worker
     # restart: unless-stopped
     depends_on:
@@ -45,11 +46,12 @@ services:
     command: sh -c "./celery.sh"
 
   flower:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: ghcr.io/m-karakus/mkpipe:latest
     container_name: flower_ui
-    restart: unless-stopped
+    # restart: unless-stopped
     depends_on:
       - db
       - rabbitmq
@@ -64,9 +66,10 @@ services:
       - "${FLOWER_PORT:-5555}:5555"
 
   mkpipe:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: ghcr.io/m-karakus/mkpipe:latest
     container_name: mkpipe
     depends_on:
       - db
