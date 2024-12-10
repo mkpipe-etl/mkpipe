@@ -65,7 +65,7 @@ You can also set up the environment manually and run MkPipe locally.
 
 ## Documentation
 
-For more detailed documentation, please visit the [GitHub repository](https://github.com/m-karakus/mkpipe).
+For more detailed documentation, please visit the [GitHub repository](https://github.com/mkpipe-etl/mkpipe).
 
 ## License
 
@@ -74,7 +74,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 
 # Db Support Plan 
 
-**For actively supported databases/plugins, please visit the [MkPipe-hub repository!](https://github.com/m-karakus/mkpipe-hub)**
+**For actively supported databases/plugins, please visit the [MkPipe-hub repository!](https://github.com/mkpipe-etl/mkpipe-hub)**
 
 ## Core Relational Databases  
 - [x]  PostgreSQL

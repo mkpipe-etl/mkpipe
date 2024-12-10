@@ -30,7 +30,7 @@ services:
     # build:
     #   context: .
     #   dockerfile: Dockerfile
-    image: ghcr.io/m-karakus/mkpipe:latest
+    image: ghcr.io/mkpipe-etl/mkpipe:latest
     container_name: celery_worker
     # restart: unless-stopped
     depends_on:
@@ -49,7 +49,7 @@ services:
     # build:
     #   context: .
     #   dockerfile: Dockerfile
-    image: ghcr.io/m-karakus/mkpipe:latest
+    image: ghcr.io/mkpipe-etl/mkpipe:latest
     container_name: flower_ui
     restart: unless-stopped
     depends_on:
@@ -69,7 +69,7 @@ services:
     # build:
     #   context: .
     #   dockerfile: Dockerfile
-    image: ghcr.io/m-karakus/mkpipe:latest
+    image: ghcr.io/mkpipe-etl/mkpipe:latest
     container_name: mkpipe
     depends_on:
       - db
