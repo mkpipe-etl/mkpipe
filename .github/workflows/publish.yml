@@ -9,8 +9,12 @@ jobs:
   build-and-push-pypi:
     name: Build PyPI Package and Push
     runs-on: ubuntu-latest
+
     permissions:
-      contents: write
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
 
     steps:
       - name: Checkout Repository
