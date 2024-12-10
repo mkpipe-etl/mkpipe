@@ -82,6 +82,6 @@ services:
       - ./logs:/app/logs:rw
       - ./.env:/app/.env:ro
       - ./mkpipe_project.yaml:/app/mkpipe_project.yaml:ro
-      - ./mkpipe-cron:/etc/cron.d/mkpipe-cron:ro  # Mount the crontab file for scheduling
+      - ./mkpipe-cron:/etc/cron.d/mkpipe-cron:rw  # Mount the crontab file for scheduling
     command: >
-      sh -c "mkpipe run && cron && tail -f /var/log/mkpipe.log"
+      sh -c "mkpipe run && crontab /etc/cron.d/mkpipe-cron && cron && tail -f /app/logs/mkpipe_log.log"

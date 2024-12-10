@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TIMEZONE = os.getenv('MKPIPE_PROJECT_TIMEZONE', 'UTC')
-ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_DIR', '/tmp/mkpipe'))
+ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_DIR', '/app'))
 ROOT_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_FILE = str(ROOT_DIR / 'mkpipe_project.yaml')
 

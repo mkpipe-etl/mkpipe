@@ -41,7 +41,7 @@ class Logger:
             # Create a formatter
             # https://docs.python.org/3/library/logging.html#logrecord-attributes
 
-            frmt = """{"timestamp" : "%(asctime)s", "levelno" : "%(levelno)s", "level" : "%(levelname)s", "message" : %(message)s, "function" : "%(name)s" }"""
+            frmt = """{"timestamp" : "%(asctime)s", "levelno" : "%(levelno)s", "level" : "%(levelname)s", "log" : %(message)s, "function" : "%(name)s" }"""
             json_formatter = logging.Formatter(frmt)
             json_formatter.converter = time.gmtime  # set timezone as gmtime
 
