@@ -13,7 +13,8 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -33,9 +34,7 @@ jobs:
           git config --global user.email "actions@github.com"
           git add setup.py
           git commit -m "Update version to $VERSION"
-          git push origin HEAD:main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
 
       - name: Build package
         run: python -m build
@@ -67,13 +66,16 @@ jobs:
         run: |
           REPO_NAME=$(basename ${{ github.repository }})
           IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/$REPO_NAME
-          BRANCH_NAME=${{ github.head_ref || github.ref_name }}
-          TAG_NAME=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9._-]/-/g')
-          docker tag dbeaver/cloudbeaver:dev $IMAGE_NAME:$TAG_NAME
+          TAG_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          docker tag my-image:latest $IMAGE_NAME:$TAG_NAME
           echo "image=$IMAGE_NAME:$TAG_NAME" >> $GITHUB_ENV
 
       - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push Docker Image
         run: docker push ${{ env.image }}
