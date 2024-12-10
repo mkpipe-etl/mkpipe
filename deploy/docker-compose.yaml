@@ -62,7 +62,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mkpipe_service
+    container_name: mkpipe
     depends_on:
       - db
       - rabbitmq
