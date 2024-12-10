@@ -9,11 +9,7 @@ from ..config import ROOT_DIR
 # from dagster import get_dagster_logger
 
 path = os.path.abspath(os.path.join(ROOT_DIR, 'logs'))
-# path = ROOT_DIR / "logs"
-# path.mkdir(exist_ok=True)  # Create the directory if it doesn't exist
-
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
-
 
 log_levels = {
     'debug': logging.DEBUG,
@@ -32,8 +28,6 @@ class Logger:
         Custom Usage:
         logger = Logger()
         msg = 'This is a log message'
-        logger.log(msg, log_level="error")
-        or
         logger.error("This is an error message")
         """
         self.logger = logging.getLogger(name)
@@ -57,7 +51,8 @@ class Logger:
 
             # Create a file handler
             # Fetch the pod name (e.g., celery-consumer-66894599cd-85dvr)
-            pod_name = os.getenv('HOSTNAME', 'unknown_pod')
+            # pod_name = os.getenv('HOSTNAME', 'unknown_pod')
+            pod_name = 'mkpipe'
 
             # date = datetime.today().strftime('%Y%m%d')
             if not os.path.exists(path):
@@ -68,20 +63,16 @@ class Logger:
                 )  # Use pod name for unique log file
             )
 
-            # use very short interval for this example, typical 'when' would be 'midnight' and no explicit interval
             fh = logging.handlers.TimedRotatingFileHandler(
                 file_path, when='midnight', backupCount=7
             )
-            # fh = logging.handlers.TimedRotatingFileHandler(file_path, when="midnight", backupCount=7)
-            # fh = logging.FileHandler(file_path, mode='a', encoding='utf8')
 
             fh.setLevel(default_log_level)
-            # fh.setFormatter(json_formatter)
-            fh.setFormatter(string_formatter)
+            fh.setFormatter(json_formatter)
+            # fh.setFormatter(string_formatter)
 
             # Create a console handler (optional)
             ch = logging.StreamHandler()
-            # ch.setLevel(logging.ERROR)
             ch.setLevel(default_log_level)
             ch.setFormatter(json_formatter)
 
@@ -93,30 +84,6 @@ class Logger:
         # msg = json.dumps(str(message))
         msg = json.dumps(message, sort_keys=True, indent=2, separators=(',', ': '))
         return msg
-
-    def log(self, message, log_level='info'):
-        msg = self.message_formatter(message)
-
-        logger = self.logger
-        if log_level == 'debug':
-            logger.debug(msg)
-            # self.dagster_logger.debug(msg)
-        elif log_level == 'info':
-            logger.info(msg)
-            # self.dagster_logger.info(msg)
-        elif log_level == 'warning':
-            logger.warning(msg)
-            # self.dagster_logger.warning(msg)
-        elif log_level == 'error':
-            logger.error(msg)
-            # self.dagster_logger.error(msg)
-        elif log_level == 'critical':
-            logger.critical(msg)
-            # self.dagster_logger.critical(msg)
-        else:
-            logger.exception(msg)
-            # self.dagster_logger.exception(msg)
-        return
 
     def debug(self, message):
         msg = self.message_formatter(message)
@@ -161,7 +128,7 @@ def log_container(name):
             try:
                 # send start message
                 # message = f'Started function: {func.__name__}'
-                # logger.log(message)
+                # logger.info(message)
                 # start_time = time.time()
 
                 # call the function
@@ -171,13 +138,15 @@ def log_container(name):
                 # message = (
                 #     f'Ended function: {func.__name__}. Time Duration(sec): {run_time} '
                 # )
-                # logger.log(message)
+                # logger.info(message)
 
                 return result
 
             except Exception as e:
-                message = str(e) + str(traceback.format_exc()).replace('\n', ' ')
-                logger.log(message, log_level='error')
+                message = {
+                    'message': str(e) + str(traceback.format_exc()).replace('\n', ' ')
+                }
+                logger.error(message)
                 raise
 
         return wrapper
