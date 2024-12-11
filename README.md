@@ -78,7 +78,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 
 ## Core Relational Databases  
 - [x]  PostgreSQL
-- [ ]  MySQL/MariaDB
+- [x]  MySQL/MariaDB
 - [ ]  SQL Server
 - [ ]  Oracle Database
 - [ ]  SQLite
