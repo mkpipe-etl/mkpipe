@@ -7,15 +7,17 @@ FROM python:${PYTHON_VERSION}-${IMAGE_VARIANT} AS py3
 # Set working directory
 WORKDIR /app
 
-# Install necessary dependencies (including Java OpenJDK, cron, and procps)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-17-jdk \
-    bash \
-    cron \
-    procps \
-    libsnappy-java \
-    libsnappy1v5 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        openjdk-17-jdk \
+        bash \
+        cron \
+        procps \
+        libsqlite3-dev \
+        build-essential \
+        libsnappy-java \
+        libsnappy1v5 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy the remaining files into the image
 COPY celery.sh /app/celery.sh
