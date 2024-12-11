@@ -1,3 +1,4 @@
+import os
 import psycopg2
 import sqlite3
 import time
@@ -41,8 +42,13 @@ def connect_sqlite(connection_params):
     Returns:
         connection: A connection object for the SQLite database.
     """
-
     database = str(ROOT_DIR / connection_params['database'])
+
+    # Ensure the directory for the database exists
+    db_dir = os.path.dirname(database)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+
     return sqlite3.connect(database)
 
 
@@ -98,7 +104,6 @@ def get_table_status(name):
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
-        # Ensure the mkpipe_manifest table exists
         with conn.cursor() as cursor:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS mkpipe_manifest (
@@ -114,8 +119,6 @@ def get_table_status(name):
             """)
             conn.commit()
 
-        # Check table status
-        with conn.cursor() as cursor:
             cursor.execute(
                 'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = %s',
                 (name,),
@@ -124,27 +127,29 @@ def get_table_status(name):
 
             if result:
                 current_status, updated_time = result
-                # Calculate time difference
                 time_diff = datetime.now() - updated_time
 
                 if time_diff > timedelta(days=1):
-                    # Update status to 'failed' if updated_time is older than 1 day
                     cursor.execute(
-                        'UPDATE mkpipe_manifest SET status = %s, updated_time = CURRENT_TIMESTAMP WHERE table_name = %s',
+                        """
+                        UPDATE mkpipe_manifest 
+                        SET status = %s, updated_time = CURRENT_TIMESTAMP 
+                        WHERE table_name = %s
+                        """,
                         ('failed', name),
                     )
                     conn.commit()
                     return 'failed'
-                else:
-                    # Return the current status if updated_time is within 1 day
-                    return current_status
+                return current_status
             else:
-                # Return None if the table_name is not found
                 return None
 
 
 @retry_on_failure()
 def get_last_point(name):
+    """
+    Retrieve the last_point value for the given table from mkpipe_manifest.
+    """
     config = load_config()
     connection_params = config['settings']['backend']
     db_type = connection_params['database_type']
@@ -152,7 +157,6 @@ def get_last_point(name):
 
     with db_connector(connection_params) as conn:
         with conn.cursor() as cursor:
-            # Retrieve last_point
             cursor.execute(
                 'SELECT last_point FROM mkpipe_manifest WHERE table_name = %s', (name,)
             )
@@ -184,7 +188,6 @@ def manifest_table_update(
                 'SELECT table_name FROM mkpipe_manifest WHERE table_name = %s', (name,)
             )
             if cursor.fetchone():
-                # Prepare update fields
                 update_fields = []
                 update_values = []
 
@@ -196,34 +199,31 @@ def manifest_table_update(
                     update_fields.append('type = %s')
                     update_values.append(value_type)
 
-                # Always update status, replication_method, and error_message
-                update_fields.append('status = %s')
-                update_values.append(status)
-
-                update_fields.append('replication_method = %s')
-                update_values.append(replication_method)
+                update_fields.extend(
+                    [
+                        'status = %s',
+                        'replication_method = %s',
+                        'updated_time = CURRENT_TIMESTAMP',
+                    ]
+                )
+                update_values.extend([status, replication_method])
 
                 if error_message is not None:
                     update_fields.append('error_message = %s')
                     update_values.append(error_message)
 
-                # Set updated_time to current timestamp
-                update_fields.append('updated_time = CURRENT_TIMESTAMP')
-
-                update_values.append(name)  # Last value is the table name
-
-                # Construct the update SQL statement
+                update_values.append(name)
                 update_sql = f"""
-                    UPDATE mkpipe_manifest
-                    SET {', '.join(update_fields)}
+                    UPDATE mkpipe_manifest 
+                    SET {', '.join(update_fields)} 
                     WHERE table_name = %s
                 """
                 cursor.execute(update_sql, tuple(update_values))
             else:
-                # Insert new entry with updated_time set to default (CURRENT_TIMESTAMP)
                 cursor.execute(
                     """
-                    INSERT INTO mkpipe_manifest (table_name, last_point, type, status, replication_method, error_message, updated_time)
+                    INSERT INTO mkpipe_manifest 
+                    (table_name, last_point, type, status, replication_method, error_message, updated_time)
                     VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                     """,
                     (
