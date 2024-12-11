@@ -42,7 +42,7 @@ def connect_sqlite(connection_params):
     Returns:
         connection: A connection object for the SQLite database.
     """
-    database = str(ROOT_DIR / connection_params['database'])
+    database = os.path.abspath(os.path.join(ROOT_DIR, 'artifacts', 'sqlite.db'))
 
     # Ensure the directory for the database exists
     db_dir = os.path.dirname(database)
