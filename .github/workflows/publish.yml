@@ -77,7 +77,7 @@ jobs:
           TAG=${GITHUB_REF#refs/tags/}
           VERSION=${TAG#v}
           # Build with version tag and latest tag
-          docker build -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest ./deploy
+          docker build -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest ./deploy/celery
           echo "image=$IMAGE_NAME:$VERSION" >> $GITHUB_ENV
           echo "image_latest=$IMAGE_NAME:latest" >> $GITHUB_ENV
 

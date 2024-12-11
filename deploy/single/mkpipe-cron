@@ -1,0 +1,5 @@
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MKPIPE_PROJECT_DIR=/app
+
+0 * * * * mkpipe run --config /app/mkpipe_project.yaml >> /app/logs/mkpipe_log.log 2>&1    # Run mkpipe every hour
+# */5 * * * * mkpipe run --config /app/mkpipe_project.yaml >> /app/logs/mkpipe_log.log 2>&1  # Run mkpipe every 5 mins

@@ -1,9 +1,10 @@
 import psycopg2
+import sqlite3
 import time
 from datetime import datetime, timedelta
 from functools import wraps
 from .register_db import register_db_connector, get_db_connector
-from ..config import load_config
+from ..config import load_config, ROOT_DIR
 from ..utils import Logger
 
 logger = Logger(__file__)
@@ -27,6 +28,22 @@ def connect_postgresql(connection_params):
         host=connection_params['host'],
         port=connection_params['port'],
     )
+
+
+@register_db_connector('sqlite')
+def connect_sqlite(connection_params):
+    """
+    Establish a connection to a SQLite database using provided connection parameters.
+
+    Parameters:
+        connection_params (dict): Dictionary containing the database file path.
+
+    Returns:
+        connection: A connection object for the SQLite database.
+    """
+
+    database = str(ROOT_DIR / connection_params['database'])
+    return sqlite3.connect(database)
 
 
 def retry_on_failure(max_attempts=5, delay=1):
@@ -77,7 +94,7 @@ def get_table_status(name):
     """
     config = load_config()
     connection_params = config['settings']['backend']
-    db_type = config['settings']['backend']['database_type']
+    db_type = connection_params['database_type']
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
@@ -85,14 +102,14 @@ def get_table_status(name):
         with conn.cursor() as cursor:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                    table_name VARCHAR(255) NOT NULL,
-                    last_point VARCHAR(50),
-                    type VARCHAR(50),
-                    replication_method VARCHAR(20) CHECK (replication_method IN ('incremental', 'full')),
-                    status VARCHAR(20) CHECK (status IN ('completed', 'failed', 'extracting', 'loading', 'extracted', 'loaded')),
+                    table_name TEXT NOT NULL,
+                    last_point TEXT,
+                    type TEXT,
+                    replication_method TEXT,
+                    status TEXT,
                     error_message TEXT,
                     updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT unique_table_name UNIQUE (table_name)  -- Unique constraint on table_name
+                    CONSTRAINT unique_table_name UNIQUE (table_name)
                 );
             """)
             conn.commit()
@@ -130,7 +147,7 @@ def get_table_status(name):
 def get_last_point(name):
     config = load_config()
     connection_params = config['settings']['backend']
-    db_type = config['settings']['backend']['database_type']
+    db_type = connection_params['database_type']
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
@@ -158,7 +175,7 @@ def manifest_table_update(
     """
     config = load_config()
     connection_params = config['settings']['backend']
-    db_type = config['settings']['backend']['database_type']
+    db_type = connection_params['database_type']
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:

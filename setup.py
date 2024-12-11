@@ -14,6 +14,7 @@ setup(
         'celery>=5.4.0',
         'kombu>=5.4.2',
         'sqlalchemy>=2.0.36',
+        'pysqlite3>=0.5.4',
     ],
     include_package_data=True,
     entry_points={
