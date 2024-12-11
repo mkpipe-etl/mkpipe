@@ -104,7 +104,8 @@ def get_table_status(name):
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        try:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS mkpipe_manifest (
                     table_name TEXT NOT NULL,
@@ -143,6 +144,8 @@ def get_table_status(name):
                 return current_status
             else:
                 return None
+        finally:
+            cursor.close()
 
 
 @retry_on_failure()
@@ -156,13 +159,15 @@ def get_last_point(name):
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        try:
             cursor.execute(
                 'SELECT last_point FROM mkpipe_manifest WHERE table_name = %s', (name,)
             )
             result = cursor.fetchone()
             return result[0] if result else None
-
+        finally:
+            cursor.close()
 
 @retry_on_failure()
 def manifest_table_update(
@@ -183,7 +188,8 @@ def manifest_table_update(
     db_connector = get_db_connector(db_type)
 
     with db_connector(connection_params) as conn:
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        try:
             cursor.execute(
                 'SELECT table_name FROM mkpipe_manifest WHERE table_name = %s', (name,)
             )
@@ -236,3 +242,5 @@ def manifest_table_update(
                     ),
                 )
             conn.commit()
+        finally:
+            cursor.close()
