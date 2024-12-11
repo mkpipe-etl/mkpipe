@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mkpipe',
-    version='0.1.31',
+    version='0.1.32',
     license='Apache License 2.0',
     packages=find_packages(exclude=['tests', 'scripts', 'deploy']),
     install_requires=[
