@@ -22,9 +22,6 @@ COPY celery.sh /app/celery.sh
 COPY flower.sh /app/flower.sh
 COPY requirements.txt requirements.txt
 
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt --no-cache-dir
-
 # Set environment variable for mkpipe project directory
 ENV MKPIPE_PROJECT_DIR=/app
 
@@ -35,5 +32,8 @@ ENV PATH=$JAVA_HOME/bin:$PATH
 # Ensure /var/log/cron.log exists
 RUN touch /var/log/cron.log
 
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt --no-cache-dir
+    
 # Entrypoint to start cron and keep the container running
 # CMD service cron start && tail -f /var/log/cron.log || tail -f /dev/null

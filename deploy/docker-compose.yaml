@@ -85,3 +85,17 @@ services:
       - ./mkpipe-cron:/etc/cron.d/mkpipe-cron:rw  # Mount the crontab file for scheduling
     command: >
       sh -c "mkpipe run && crontab /etc/cron.d/mkpipe-cron && cron && tail -f /app/logs/mkpipe_log.log"
+
+
+
+  # mysql:
+  #   image: mysql:9.1.0
+  #   container_name: mysql 
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_DATABASE: "db"
+  #     MYSQL_USER: "user"
+  #     MYSQL_PASSWORD: "password"
+  #     MYSQL_ROOT_PASSWORD: "password"
+  #   ports:
+  #     - "3306:3306"

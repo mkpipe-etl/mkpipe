@@ -3,4 +3,4 @@ mkpipe
 mkpipe-extractor-postgres
 mkpipe-loader-postgres
 mkpipe-extractor-mysql
-mkpipe-loader-mysql
+mkpipe-loader-mysql>=0.1.9
