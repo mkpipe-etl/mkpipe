@@ -11,6 +11,11 @@ logger = Logger(__file__)
 
 
 def create_spark_session(settings):
+    # Stop existing session if it exists
+    existing_session = SparkSession.getActiveSession()
+    if existing_session:
+        existing_session.stop()
+    
     conf = SparkConf()
     conf.setAppName(settings.driver_name)
     conf.setMaster('local[*]')
