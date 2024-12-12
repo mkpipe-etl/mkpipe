@@ -71,14 +71,13 @@ class ConnectorPostgresql:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                        table_name VARCHAR(255) NOT NULL,
+                        table_name VARCHAR(255) PRIMARY KEY,
                         last_point VARCHAR(50),
                         type VARCHAR(50),
                         replication_method VARCHAR(20) CHECK (replication_method IN ('incremental', 'full')),
                         status VARCHAR(20) CHECK (status IN ('completed', 'failed', 'extracting', 'loading', 'extracted', 'loaded')),
                         error_message TEXT,
-                        updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        CONSTRAINT unique_table_name UNIQUE (table_name)
+                        updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
                 conn.commit()

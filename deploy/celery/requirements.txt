@@ -1,6 +1,6 @@
-flower
-mkpipe
-mkpipe-extractor-postgres
-mkpipe-loader-postgres
-mkpipe-extractor-mysql
-mkpipe-loader-mysql>=0.1.9
+flower>=2.0.1
+mkpipe>=0.1.39
+mkpipe-extractor-postgres>=0.1.32
+mkpipe-loader-postgres>=0.1.32
+mkpipe-extractor-mysql>=0.1.10
+mkpipe-loader-mysql>=0.1.10

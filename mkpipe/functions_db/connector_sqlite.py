@@ -76,15 +76,14 @@ class ConnectorSQLite:
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                        table_name TEXT NOT NULL,
+                        table_name TEXT PRIMARY KEY,
                         last_point TEXT,
                         type TEXT,
                         replication_method TEXT CHECK (replication_method IN ('incremental', 'full')),
                         status TEXT CHECK (status IN ('completed', 'failed', 'extracting', 'loading', 'extracted', 'loaded')),
                         error_message TEXT,
-                        updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE (table_name)
-                    )
+                        updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
                     """
                 )
 
