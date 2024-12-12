@@ -1,3 +1,6 @@
+from .connector_postgresql import ConnectorPostgresql
+from .connector_sqlite import ConnectorSqlite
+
 DB_CONNECTIONS = {}
 
 
@@ -35,3 +38,13 @@ def get_db_connector(db_type):
     if db_type not in DB_CONNECTIONS:
         raise ValueError(f'Unsupported database type: {db_type}')
     return DB_CONNECTIONS[db_type]
+
+
+@register_db_connector('postgresql')
+def connector_postgresql(connection_params):
+    return ConnectorPostgresql(connection_params)
+
+@register_db_connector('sqlite')
+def connector_sqlite(connection_params):
+    return ConnectorSqlite(connection_params)
+

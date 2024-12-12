@@ -1,7 +1,3 @@
-from .connector import get_last_point, manifest_table_update, get_table_status
+from .register_db import get_db_connector
 
-__all__ = (
-    get_last_point,
-    manifest_table_update,
-    get_table_status,
-)
+__all__ = get_db_connector
