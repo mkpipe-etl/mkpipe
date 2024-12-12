@@ -12,7 +12,7 @@ logger = Logger(__file__)
 
 def create_spark_session(settings):
     conf = SparkConf()
-    conf.setAppName(__file__)
+    conf.setAppName(settings.driver_name)
     conf.setMaster('local[*]')
     conf.set('spark.driver.memory', settings.spark_driver_memory)
     conf.set('spark.executor.memory', settings.spark_executor_memory)

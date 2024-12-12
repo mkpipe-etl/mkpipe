@@ -9,9 +9,9 @@ services:
       POSTGRES_USER: ${PGUSER:-postgres}
       POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
       POSTGRES_DB: ${PGDB:-postgres}
-    volumes:
-      - ${POSTGRES_DATA:-./postgres_data}:/var/lib/postgresql/data:rw
-      # - ./dbscripts:/docker-entrypoint-initdb.d
+    # volumes:
+    #   - ${POSTGRES_DATA:-./postgres_data}:/var/lib/postgresql/data:rw
+    #   # - ./dbscripts:/docker-entrypoint-initdb.d
 
   rabbitmq:
     image: rabbitmq:management
@@ -23,14 +23,13 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
-    volumes:
-      - ${RABBITMQ_DATA:-./rabbitmq_data}:/var/lib/rabbitmq:rw
+    # volumes:
+    #   - ${RABBITMQ_DATA:-./rabbitmq_data}:/var/lib/rabbitmq:rw
 
   celery_worker:
     build:
       context: .
       dockerfile: Dockerfile
-    # image: ghcr.io/mkpipe-etl/mkpipe:latest
     container_name: celery_worker
     # restart: unless-stopped
     depends_on:
@@ -88,14 +87,14 @@ services:
 
 
 
-  # mysql:
-  #   image: mysql:9.1.0
-  #   container_name: mysql 
-  #   restart: unless-stopped
-  #   environment:
-  #     MYSQL_DATABASE: "db"
-  #     MYSQL_USER: "user"
-  #     MYSQL_PASSWORD: "password"
-  #     MYSQL_ROOT_PASSWORD: "password"
-  #   ports:
-  #     - "3306:3306"
+  mysql:
+    image: mysql:9.1.0
+    container_name: mysql 
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: "db"
+      MYSQL_USER: "user"
+      MYSQL_PASSWORD: "password"
+      MYSQL_ROOT_PASSWORD: "password"
+    ports:
+      - "3306:3306"
