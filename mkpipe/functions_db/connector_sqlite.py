@@ -8,6 +8,7 @@ from ..config import ROOT_DIR
 
 logger = Logger(__file__)
 
+
 def retry_on_failure(max_attempts=5, delay=1):
     """
     Decorator to retry a database operation upon failure.
@@ -46,6 +47,7 @@ def retry_on_failure(max_attempts=5, delay=1):
 
     return decorator
 
+
 class ConnectorSQLite:
     def __init__(self, connection_params):
         self.connection_params = connection_params
@@ -57,7 +59,9 @@ class ConnectorSQLite:
             os.makedirs(db_dir, exist_ok=True)
 
     def connect(self):
-        return sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+        return sqlite3.connect(
+            self.db_path, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+        )
 
     @retry_on_failure()
     def get_table_status(self, name):
@@ -92,7 +96,9 @@ class ConnectorSQLite:
 
                 if result:
                     current_status = result['status']
-                    updated_time = datetime.strptime(result['updated_time'], '%Y-%m-%d %H:%M:%S')
+                    updated_time = datetime.strptime(
+                        result['updated_time'], '%Y-%m-%d %H:%M:%S'
+                    )
                     time_diff = datetime.now() - updated_time
 
                     if time_diff > timedelta(days=1):
