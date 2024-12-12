@@ -4,7 +4,7 @@ setup(
     name='mkpipe',
     version='0.1.40',
     license='Apache License 2.0',
-    packages=find_packages(exclude=['tests', 'scripts', 'deploy']),
+    packages=find_packages(exclude=['tests', 'scripts', 'deploy', 'install_jars.py']),
     install_requires=[
         'psycopg2-binary>=2.9.10',
         'pyspark>=3.5.3',
