@@ -94,10 +94,7 @@ class ConnectorSQLite:
                 result = cursor.fetchone()
 
                 if result:
-                    current_status = result['status']
-                    updated_time = datetime.strptime(
-                        result['updated_time'], '%Y-%m-%d %H:%M:%S'
-                    )
+                    current_status, updated_time = result
                     time_diff = datetime.now() - updated_time
 
                     if time_diff > timedelta(days=1):
