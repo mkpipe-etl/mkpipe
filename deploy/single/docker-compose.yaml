@@ -1,17 +1,28 @@
 services:
+  # db:
+  #   image: postgres
+  #   container_name: db 
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${PGPORT:-5432}:5432"
+  #   environment:
+  #     POSTGRES_USER: ${PGUSER:-postgres}
+  #     POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
+  #     POSTGRES_DB: ${PGDB:-postgres}
+  #   volumes:
+  #     - ${POSTGRES_DATA:-./postgres_data}:/var/lib/postgresql/data:rw
+  #     # - ./dbscripts:/docker-entrypoint-initdb.d
+
   db:
-    image: postgres
-    container_name: db 
-    restart: unless-stopped
-    ports:
-      - "${PGPORT:-5432}:5432"
+    image: mariadb:latest
+    container_name: db
     environment:
-      POSTGRES_USER: ${PGUSER:-postgres}
-      POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
-      POSTGRES_DB: ${PGDB:-postgres}
-    volumes:
-      - ${POSTGRES_DATA:-./postgres_data}:/var/lib/postgresql/data:rw
-      # - ./dbscripts:/docker-entrypoint-initdb.d
+      MYSQL_DATABASE: "db"
+      MYSQL_USER: "user"
+      MYSQL_PASSWORD: "password"
+      MYSQL_ROOT_PASSWORD: "password"
+    ports:
+      - "3306:3306"
 
   mkpipe:
     build:

@@ -4,3 +4,4 @@ mkpipe-extractor-postgres>=0.1.32
 mkpipe-loader-postgres>=0.1.32
 mkpipe-extractor-mysql>=0.1.10
 mkpipe-loader-mysql>=0.1.10
+mkpipe-loader-mariadb
