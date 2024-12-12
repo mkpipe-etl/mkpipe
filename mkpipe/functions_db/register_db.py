@@ -1,5 +1,5 @@
 from .connector_postgresql import ConnectorPostgresql
-from .connector_sqlite import ConnectorSqlite
+from .connector_sqlite import ConnectorSQLite
 
 DB_CONNECTIONS = {}
 
@@ -46,5 +46,5 @@ def connector_postgresql(connection_params):
 
 @register_db_connector('sqlite')
 def connector_sqlite(connection_params):
-    return ConnectorSqlite(connection_params)
+    return ConnectorSQLite(connection_params)
 

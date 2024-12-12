@@ -1,11 +1,12 @@
-import psycopg2
+import os
+import sqlite3
 import time
 from datetime import datetime, timedelta
 from functools import wraps
 from ..utils import Logger
+from ..config import ROOT_DIR
 
 logger = Logger(__file__)
-
 
 def retry_on_failure(max_attempts=5, delay=1):
     """
@@ -45,19 +46,18 @@ def retry_on_failure(max_attempts=5, delay=1):
 
     return decorator
 
-
-class ConnectorSqlite:
+class ConnectorSQLite:
     def __init__(self, connection_params):
         self.connection_params = connection_params
+        self.db_path = os.path.abspath(os.path.join(ROOT_DIR, 'artifacts', 'sqlite.db'))
+
+        # Ensure the directory for the database exists
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
 
     def connect(self):
-        return psycopg2.connect(
-            database=self.connection_params['database'],
-            user=self.connection_params['user'],
-            password=self.connection_params['password'],
-            host=self.connection_params['host'],
-            port=self.connection_params['port'],
-        )
+        return sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
 
     @retry_on_failure()
     def get_table_status(self, name):
@@ -67,39 +67,39 @@ class ConnectorSqlite:
         If the table does not exist, create it first.
         """
         with self.connect() as conn:
-            # Ensure the mkpipe_manifest table exists
-            with conn.cursor() as cursor:
-                cursor.execute("""
+            conn.row_factory = sqlite3.Row
+            with conn:
+                conn.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                        table_name VARCHAR(255) NOT NULL,
-                        last_point VARCHAR(50),
-                        type VARCHAR(50),
-                        replication_method VARCHAR(20) CHECK (replication_method IN ('incremental', 'full')),
-                        status VARCHAR(20) CHECK (status IN ('completed', 'failed', 'extracting', 'loading', 'extracted', 'loaded')),
+                        table_name TEXT NOT NULL,
+                        last_point TEXT,
+                        type TEXT,
+                        replication_method TEXT CHECK (replication_method IN ('incremental', 'full')),
+                        status TEXT CHECK (status IN ('completed', 'failed', 'extracting', 'loading', 'extracted', 'loaded')),
                         error_message TEXT,
                         updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        CONSTRAINT unique_table_name UNIQUE (table_name)
-                    );
-                """)
-                conn.commit()
+                        UNIQUE (table_name)
+                    )
+                    """
+                )
 
-                # Check table status
-                cursor.execute(
-                    'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = %s',
+                cursor = conn.execute(
+                    'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = ?',
                     (name,),
                 )
                 result = cursor.fetchone()
 
                 if result:
-                    current_status, updated_time = result
+                    current_status = result['status']
+                    updated_time = datetime.strptime(result['updated_time'], '%Y-%m-%d %H:%M:%S')
                     time_diff = datetime.now() - updated_time
 
                     if time_diff > timedelta(days=1):
-                        cursor.execute(
-                            'UPDATE mkpipe_manifest SET status = %s, updated_time = CURRENT_TIMESTAMP WHERE table_name = %s',
+                        conn.execute(
+                            'UPDATE mkpipe_manifest SET status = ?, updated_time = CURRENT_TIMESTAMP WHERE table_name = ?',
                             ('failed', name),
                         )
-                        conn.commit()
                         return 'failed'
                     else:
                         return current_status
@@ -112,13 +112,14 @@ class ConnectorSqlite:
         Retrieve the last_point value for the given table.
         """
         with self.connect() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    'SELECT last_point FROM mkpipe_manifest WHERE table_name = %s',
+            conn.row_factory = sqlite3.Row
+            with conn:
+                cursor = conn.execute(
+                    'SELECT last_point FROM mkpipe_manifest WHERE table_name = ?',
                     (name,),
                 )
                 result = cursor.fetchone()
-                return result[0] if result else None
+                return result['last_point'] if result else None
 
     @retry_on_failure()
     def manifest_table_update(
@@ -134,9 +135,10 @@ class ConnectorSqlite:
         Update or insert the last point value, value type, status, and error message for a specified table.
         """
         with self.connect() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    'SELECT table_name FROM mkpipe_manifest WHERE table_name = %s',
+            conn.row_factory = sqlite3.Row
+            with conn:
+                cursor = conn.execute(
+                    'SELECT table_name FROM mkpipe_manifest WHERE table_name = ?',
                     (name,),
                 )
                 if cursor.fetchone():
@@ -145,22 +147,22 @@ class ConnectorSqlite:
                     update_values = []
 
                     if value is not None:
-                        update_fields.append('last_point = %s')
+                        update_fields.append('last_point = ?')
                         update_values.append(value)
 
                     if value_type is not None:
-                        update_fields.append('type = %s')
+                        update_fields.append('type = ?')
                         update_values.append(value_type)
 
                     # Always update status, replication_method, and error_message
-                    update_fields.append('status = %s')
+                    update_fields.append('status = ?')
                     update_values.append(status)
 
-                    update_fields.append('replication_method = %s')
+                    update_fields.append('replication_method = ?')
                     update_values.append(replication_method)
 
                     if error_message is not None:
-                        update_fields.append('error_message = %s')
+                        update_fields.append('error_message = ?')
                         update_values.append(error_message)
 
                     update_fields.append('updated_time = CURRENT_TIMESTAMP')
@@ -171,15 +173,15 @@ class ConnectorSqlite:
                     update_sql = f"""
                         UPDATE mkpipe_manifest
                         SET {', '.join(update_fields)}
-                        WHERE table_name = %s
+                        WHERE table_name = ?
                     """
-                    cursor.execute(update_sql, tuple(update_values))
+                    conn.execute(update_sql, tuple(update_values))
                 else:
                     # Insert new entry
-                    cursor.execute(
+                    conn.execute(
                         """
                         INSERT INTO mkpipe_manifest (table_name, last_point, type, status, replication_method, error_message, updated_time)
-                        VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                         """,
                         (
                             name,
@@ -190,4 +192,3 @@ class ConnectorSqlite:
                             error_message,
                         ),
                     )
-                conn.commit()
