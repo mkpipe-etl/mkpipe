@@ -1,7 +1,3 @@
-flower>=2.0.1
-mkpipe>=0.1.40
-mkpipe-extractor-postgres>=0.1.32
-mkpipe-loader-postgres>=0.1.32
-mkpipe-extractor-mysql>=0.1.10
-mkpipe-loader-mysql>=0.1.10
-mkpipe-loader-mariadb>=0.1.3
+mkpipe>=0.1.44
+mkpipe-extractor-postgres>=0.1.36
+mkpipe-loader-mysql>=0.1.13

@@ -6,19 +6,14 @@ from pyspark.sql import SparkSession
 from pyspark import SparkConf
 from ..config import ROOT_DIR
 from ..utils import Logger
+from ..plugins import collect_jars
 
 logger = Logger(__file__)
 
 
 def create_spark_session(settings):
-    # Stop existing session if it exists
-    existing_session = SparkSession.getActiveSession()
-    if existing_session:
-        existing_session.stop()
-    
-    import glob
-    jars = ",".join(glob.glob('/home/mk/codes/project_mkpipe/dbs/jars/*'))
-    
+    jars = collect_jars()
+
     conf = SparkConf()
     conf.setAppName(settings.driver_name)
     conf.setMaster('local[*]')
@@ -56,8 +51,6 @@ def create_spark_session(settings):
     )
 
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
-    print(spark.sparkContext.getConf().get("spark.jars"))
-
     return spark
 
 
