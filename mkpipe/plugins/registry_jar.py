@@ -42,7 +42,7 @@ def collect_jars():
     # print(f"Collected JAR paths: {jar_paths}")
 
     str_jar_paths = ','.join(jar_paths)
-    print(str_jar_paths)
+    # print(str_jar_paths)
     return str_jar_paths
 
 
