@@ -6,7 +6,7 @@ from pyspark.sql import SparkSession
 from pyspark import SparkConf
 from ..config import ROOT_DIR
 from ..utils import Logger
-from ..plugins import collect_jars
+from ..plugins.registry_jar import collect_jars
 
 logger = Logger(__file__)
 
