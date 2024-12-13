@@ -1,3 +1,5 @@
 mkpipe>=0.1.46
-mkpipe-extractor-postgres>=0.1.39
+mkpipe-extractor-postgres>=0.1.40
+mkpipe-extractor-mysql>=0.1.13
 mkpipe-loader-mysql>=0.1.12
+mkpipe-loader-postgres>=0.1.33
