@@ -16,12 +16,17 @@ def create_spark_session(settings):
     if existing_session:
         existing_session.stop()
     
+    import glob
+    jars = ",".join(glob.glob('/home/mk/codes/project_mkpipe/dbs/jars/*'))
+    
     conf = SparkConf()
     conf.setAppName(settings.driver_name)
     conf.setMaster('local[*]')
     conf.set('spark.driver.memory', settings.spark_driver_memory)
     conf.set('spark.executor.memory', settings.spark_executor_memory)
-    conf.set('spark.driver.extraClassPath', settings.jars_path)
+    conf.set('spark.jars', jars)  # Distribute jars
+    conf.set('spark.driver.extraClassPath', jars)
+    conf.set('spark.executor.extraClassPath', jars)
     conf.set('spark.network.timeout', '600s')
     conf.set('spark.sql.parquet.datetimeRebaseModeInRead', 'CORRECTED')
     conf.set('spark.sql.parquet.datetimeRebaseModeInWrite', 'CORRECTED')
@@ -50,7 +55,10 @@ def create_spark_session(settings):
         '-XX:ErrorFile=/tmp/java_error%p.log -XX:HeapDumpPath=/tmp',
     )
 
-    return SparkSession.builder.config(conf=conf).getOrCreate()
+    spark = SparkSession.builder.config(conf=conf).getOrCreate()
+    print(spark.sparkContext.getConf().get("spark.jars"))
+
+    return spark
 
 
 def remove_partitioned_parquet(directory_path):

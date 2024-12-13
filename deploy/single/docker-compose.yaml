@@ -1,7 +1,7 @@
 services:
   # db:
   #   image: postgres
-  #   container_name: db 
+  #   container_name: db
   #   restart: unless-stopped
   #   ports:
   #     - "${PGPORT:-5432}:5432"
@@ -14,7 +14,8 @@ services:
   #     # - ./dbscripts:/docker-entrypoint-initdb.d
 
   db:
-    image: mariadb:latest
+    # image: mariadb:latest
+    image: mysql:8.4.3
     container_name: db
     environment:
       MYSQL_DATABASE: "db"
@@ -39,6 +40,6 @@ services:
       - ./logs:/app/logs:rw
       - ./.env:/app/.env:ro
       - ./mkpipe_project.yaml:/app/mkpipe_project.yaml:ro
-      - ./mkpipe-cron:/etc/cron.d/mkpipe-cron:rw  # Mount the crontab file for scheduling
+      - ./mkpipe-cron:/etc/cron.d/mkpipe-cron:rw # Mount the crontab file for scheduling
     command: >
       sh -c "mkpipe run && crontab /etc/cron.d/mkpipe-cron && cron && tail -f /app/logs/mkpipe_log.log"
