@@ -4,9 +4,10 @@ from typing import Optional
 
 class PipeSettings(BaseModel):
     timezone: str = 'UTC'
-    partitions_count: int = 2
+    compression_codec: str = 'zstd'  # Options: snappy, gzip, zstd, lz4, none
     spark_driver_memory: str = '4g'
     spark_executor_memory: str = '3g'
+    partitions_count: int = 2
     default_iterate_max_loop: int = 1000
     default_iterate_batch_size: int = 500000
     ROOT_DIR: str
