@@ -10,7 +10,6 @@ class PipeSettings(BaseModel):
     default_iterate_max_loop: int = 1000
     default_iterate_batch_size: int = 500000
     ROOT_DIR: str
-    jars_path: Optional[str] = None
     driver_name: Optional[str] = None
 
 
