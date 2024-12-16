@@ -82,7 +82,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 - [x]  MariaDB
 - [ ]  SQL Server
 - [ ]  Oracle Database
-- [ ]  SQLite
+- [x]  SQLite
 - [ ]  Snowflake
 - [ ]  Google BigQuery
 - [ ]  Amazon Redshift

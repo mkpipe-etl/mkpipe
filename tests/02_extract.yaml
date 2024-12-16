@@ -16,22 +16,14 @@ prod:
 
   connections:
     source:
-      host: localhost
-      port: 3306
-      database: db
-      user: user
-      password: password
+      db_path: /home/mk/codes/project_mkpipe/mkpipe/tests/sqlite_data.db
     destination:
-      host: hh-pgsql-public.ebi.ac.uk
-      port: 5432
-      database: pfmegrnargs
-      schema: rnacen
-      user: reader
-      password: NWDMCE5xdipIjRrp
+      db_path: /home/mk/codes/project_mkpipe/mkpipe/tests/readed_sqlite_data.db
+
 
   extractors:
     extract_data:
-      variant: postgresql
+      variant: sqlite
       config:
         connection_ref: source
         tables:
@@ -43,11 +35,11 @@ prod:
 
   loaders:
     load_data:
-      variant: mariadb
+      variant: sqlite 
       config:
         connection_ref: destination
 
   jobs:
-    - name: test_pipeline
+    - name: test_pipeline 
       extract_task: extract_data
       load_task: load_data
