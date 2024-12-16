@@ -1,0 +1,53 @@
+version: 1
+default_environment: prod
+project_id: 7a30229a-4a52-4915-8d84-a434da1d597a
+prod:
+  settings:
+    run_coordinator: single
+    timezone: "UTC"
+    partitions_count: 2
+    spark_driver_memory: "4g"
+    spark_executor_memory: "3g"
+    default_iterate_max_loop: 1000
+    default_iterate_batch_size: 500000
+
+    backend:
+      database_type: sqlite
+
+  connections:
+    source:
+      host: localhost
+      port: 3306
+      database: db
+      user: user
+      password: password
+    destination:
+      host: hh-pgsql-public.ebi.ac.uk
+      port: 5432
+      database: pfmegrnargs
+      schema: rnacen
+      user: reader
+      password: NWDMCE5xdipIjRrp
+
+  extractors:
+    extract_data:
+      variant: postgresql
+      config:
+        connection_ref: source
+        tables:
+          - iterate_column_type: int
+            name: rnc_database
+            partitions_column: id
+            replication_method: incremental
+            target_name: rnc_database
+
+  loaders:
+    load_data:
+      variant: mariadb
+      config:
+        connection_ref: destination
+
+  jobs:
+    - name: test_pipeline
+      extract_task: extract_data
+      load_task: load_data
