@@ -80,7 +80,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 - [x]  PostgreSQL
 - [x]  MySQL
 - [x]  MariaDB
-- [ ]  SQL Server
+- [x]  SQL Server
 - [ ]  Oracle Database
 - [x]  SQLite
 - [ ]  Snowflake

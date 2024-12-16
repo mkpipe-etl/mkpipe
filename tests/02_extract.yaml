@@ -16,7 +16,11 @@ prod:
 
   connections:
     source:
-      db_path: /home/mk/codes/project_mkpipe/mkpipe/tests/sqlite_data.db
+      host: localhost
+      port: 3306
+      database: db
+      user: user
+      password: password
     destination:
       db_path: /home/mk/codes/project_mkpipe/mkpipe/tests/readed_sqlite_data.db
 
