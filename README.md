@@ -81,7 +81,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 - [x]  MySQL
 - [x]  MariaDB
 - [x]  SQL Server
-- [ ]  Oracle Database
+- [x]  Oracle Database
 - [x]  SQLite
 - [ ]  Snowflake
 - [ ]  Google BigQuery
