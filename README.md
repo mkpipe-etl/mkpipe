@@ -85,7 +85,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 - [x]  SQLite
 - [ ]  Snowflake
 - [ ]  Google BigQuery
-- [ ]  Amazon Redshift
+- [x]  Amazon Redshift
 - [ ]  ClickHouse
 - [ ]  Amazon S3
 ---
