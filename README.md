@@ -87,7 +87,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 - [ ]  Google BigQuery
 - [x]  Amazon Redshift
 - [ ]  ClickHouse
-- [ ]  Amazon S3
+- [x]  Amazon S3
 ---
 ## NoSQL Databases  
 - [ ]  MongoDB
