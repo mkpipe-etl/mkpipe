@@ -50,28 +50,22 @@ class ConnectorClickhouse:
 
     @retry_on_failure()
     def get_table_status(self, name):
-        """
-        Check the status of a table from the mkpipe_manifest. If the updated_time is older than 1 day,
-        update the status to 'failed' and return 'failed'. Otherwise, return the current status.
-        If the table does not exist, create it first.
-        """
         client = self.connect()
         client.command("""
             CREATE TABLE IF NOT EXISTS mkpipe_manifest (
                 table_name String,
-                last_point String,
-                type String,
-                replication_method Enum('incremental' = 1, 'full' = 2),
-                status Enum('completed' = 1, 'failed' = 2, 'extracting' = 3, 'loading' = 4, 'extracted' = 5, 'loaded' = 6),
-                error_message String,
+                last_point Nullable(String),
+                type Nullable(String),
+                replication_method Nullable(String),
+                status Nullable(String),
+                error_message Nullable(String),
                 updated_time DateTime DEFAULT now()
             ) ENGINE = MergeTree()
             ORDER BY table_name;
         """)
 
         query_result = client.query(
-            'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = %(name)s',
-            parameters={'name': name},
+            f"SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = '{name}'"
         )
 
         result = query_result.first_row if query_result.row_count != 0 else None
@@ -80,11 +74,10 @@ class ConnectorClickhouse:
             time_diff = datetime.now() - updated_time
             if time_diff > timedelta(days=1):
                 client.command(
-                    """
+                    f"""
                     ALTER TABLE mkpipe_manifest UPDATE status = 'failed', updated_time = now()
-                    WHERE table_name = %(name)s
-                """,
-                    parameters={'name': name},
+                    WHERE table_name = '{name}'
+                """
                 )
                 return 'failed'
             else:
@@ -96,12 +89,11 @@ class ConnectorClickhouse:
     def get_last_point(self, name):
         client = self.connect()
         query_result = client.query(
-            'SELECT last_point FROM mkpipe_manifest WHERE table_name = %(name)s',
-            parameters={'name': name},
+            f"SELECT last_point FROM mkpipe_manifest WHERE table_name = '{name}'"
         )
 
         result = query_result.first_row if query_result.row_count != 0 else None
-        return result
+        return result[0]
 
     @retry_on_failure()
     def manifest_table_update(
@@ -116,56 +108,54 @@ class ConnectorClickhouse:
         client = self.connect()
 
         query_result = client.query(
-            'SELECT table_name FROM mkpipe_manifest WHERE table_name = %(name)s',
-            parameters={'name': name},
+            f"SELECT table_name FROM mkpipe_manifest WHERE table_name = '{name}'"
         )
 
         result = query_result.first_row if query_result.row_count != 0 else None
         if result:
             update_parts = []
-            update_params = {}
 
             if value is not None:
-                update_parts.append('last_point = %(last_point)s')
-                update_params['last_point'] = value
+                update_parts.append(f"last_point = '{value}'")
             if value_type is not None:
-                update_parts.append('type = %(type)s')
-                update_params['type'] = value_type
+                update_parts.append(f"type = '{value_type}'")
 
-            update_parts.append('status = %(status)s')
-            update_params['status'] = status
-
-            update_parts.append('replication_method = %(replication_method)s')
-            update_params['replication_method'] = replication_method
+            update_parts.append(f"status = '{status}'")
+            update_parts.append(f"replication_method = '{replication_method}'")
 
             if error_message is not None:
-                update_parts.append('error_message = %(error_message)s')
-                update_params['error_message'] = error_message
+                update_parts.append(f"error_message = '{error_message}'")
 
-            update_parts.append('updated_time = now()')
-            update_params['name'] = name
+            update_parts.append("updated_time = now()")
 
             update_sql = f"""
-                ALTER TABLE mkpipe_manifest UPDATE {', '.join(update_parts)} WHERE table_name = %(name)s
+                ALTER TABLE mkpipe_manifest UPDATE {', '.join(update_parts)} WHERE table_name = '{name}'
             """
-            client.command(update_sql, parameters=update_params)
+            client.command(update_sql)
         else:
             client.command(
-                """
+                f"""
                 INSERT INTO mkpipe_manifest (
                     table_name, last_point, type, status,
                     replication_method, error_message, updated_time
                 ) VALUES (
-                    %(name)s, %(last_point)s, %(type)s, %(status)s,
-                    %(replication_method)s, %(error_message)s, now()
+                    {format_clickhouse_value(name)},
+                    {format_clickhouse_value(value)},
+                    {format_clickhouse_value(value_type)},
+                    {format_clickhouse_value(status)},
+                    {format_clickhouse_value(replication_method)},
+                    {format_clickhouse_value(error_message)},
+                    now()
                 )
-            """,
-                parameters={
-                    'name': name,
-                    'last_point': value or '',
-                    'type': value_type or '',
-                    'status': status,
-                    'replication_method': replication_method,
-                    'error_message': error_message or '',
-                },
+                """
             )
+
+def format_clickhouse_value(val):
+    if val is None:
+        return "NULL"
+    elif isinstance(val, str):
+        return f"'{val}'"
+    elif isinstance(val, (int, float)):
+        return str(val)
+    else:
+        raise ValueError(f"Unsupported value type: {type(val)}")
