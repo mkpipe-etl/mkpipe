@@ -15,6 +15,7 @@ setup(
         'kombu>=5.4.2',
         'sqlalchemy>=2.0.36',
         'pysqlite3>=0.5.4',
+        'duckdb>=1.2.1',
     ],
     include_package_data=True,
     entry_points={
