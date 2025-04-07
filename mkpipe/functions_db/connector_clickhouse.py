@@ -69,11 +69,12 @@ class ConnectorClickhouse:
             ORDER BY table_name;
         """)
 
-        result = client.query(
+        query_result = client.query(
             'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = %(name)s',
             parameters={'name': name},
-        ).first_row
+        )
 
+        result = query_result.first_row if query_result.row_count != 0 else None
         if result:
             current_status, updated_time = result
             time_diff = datetime.now() - updated_time
@@ -94,11 +95,13 @@ class ConnectorClickhouse:
     @retry_on_failure()
     def get_last_point(self, name):
         client = self.connect()
-        result = client.query(
+        query_result = client.query(
             'SELECT last_point FROM mkpipe_manifest WHERE table_name = %(name)s',
             parameters={'name': name},
-        ).first_row
-        return result[0] if result else None
+        )
+
+        result = query_result.first_row if query_result.row_count != 0 else None
+        return result
 
     @retry_on_failure()
     def manifest_table_update(
@@ -112,11 +115,12 @@ class ConnectorClickhouse:
     ):
         client = self.connect()
 
-        result = client.query(
+        query_result = client.query(
             'SELECT table_name FROM mkpipe_manifest WHERE table_name = %(name)s',
             parameters={'name': name},
-        ).first_row
+        )
 
+        result = query_result.first_row if query_result.row_count != 0 else None
         if result:
             update_parts = []
             update_params = {}
