@@ -16,6 +16,7 @@ setup(
         'sqlalchemy>=2.0.36',
         'pysqlite3>=0.5.4',
         'duckdb>=1.2.1',
+        'clickhouse-connect>=0.8.16',
     ],
     include_package_data=True,
     entry_points={
