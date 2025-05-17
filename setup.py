@@ -7,7 +7,7 @@ setup(
     packages=find_packages(exclude=['tests', 'scripts', 'deploy', 'install_jars.py']),
     install_requires=[
         'psycopg2-binary>=2.9.10',
-        'pyspark>=3.5.3',
+        'pyspark>=3.5.5',
         'pydantic>=2.10.3',
         'PyYAML>=6.0.2',
         'python-dotenv>=1.0.1',
