@@ -9,7 +9,7 @@ class PipeSettings(BaseModel):
     spark_executor_memory: str = '3g'
     partitions_count: int = 2
     default_iterate_max_loop: int = 1000
-    default_iterate_batch_size: int = 500000
+    default_chunk_count_for_partition: int = 1
     ROOT_DIR: str
     driver_name: Optional[str] = None
 

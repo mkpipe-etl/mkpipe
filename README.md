@@ -21,21 +21,21 @@ This method sets up all required services automatically using Docker Compose.
 
 #### Steps:
 
-1. Clone or copy the [`deploy`](./deploy/) folder from the repository.
+1. Clone or copy the [`deploy`](./deploy/single) folder from the repository.
 2. Modify the configuration files:
-   - [`.env`](./deploy/.env.example) for environment variables.
-   - [`mkpipe_project.yaml`](./deploy/mkpipe_project.yaml.example) for your specific ETL configurations.
+   - [`.env`](./deploy/celery/.env.example) for environment variables.
+   - [`mkpipe_project.yaml`](./deploy/celery/mkpipe_project.yaml.example) for your specific ETL configurations.
 3. Run the following command to start the services:
    ```bash
    docker-compose up --build
    ```
    This will set up the following services:
    - PostgreSQL: Required for data storage.
-   - RabbitMQ: Required for the Celery [`run_coordinator=celery`](./deploy/mkpipe_project.yaml.example#L7).
-   - Celery Worker: Required for running the Celery [`run_coordinator=celery`](./deploy/mkpipe_project.yaml.example#L7).
+   - RabbitMQ: Required for the Celery [`run_coordinator=celery`](./deploy/celery/mkpipe_project.yaml.example#L7).
+   - Celery Worker: Required for running the Celery [`run_coordinator=celery`](./deploy/celery/mkpipe_project.yaml.example#L7).
    - Flower UI: Optional, but required for monitoring Celery tasks.
 
-   **Note:** If you only want to use the [`run_coordinator=single`](./deploy/mkpipe_project.yaml.example#L7)without Celery, only PostgreSQL is necessary.
+   **Note:** If you only want to use the [`run_coordinator=single`](./deploy/single/mkpipe_project.yaml.example#L7)without Celery, only PostgreSQL is necessary.
 
 ### 2. Running Locally
 
