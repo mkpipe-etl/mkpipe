@@ -22,6 +22,7 @@ class BaseExtractor:
         self.username = self.connection_params['user']
         self.password = self.build_passord()
         self.database = self.connection_params['database']
+        self.schema = self.connection_params.get('schema', None)
 
         self.driver_name = driver_name
         self.driver_jdbc = driver_jdbc
