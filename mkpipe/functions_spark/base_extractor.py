@@ -138,6 +138,9 @@ class BaseExtractor:
             else:
                 raise ValueError(f'Unsupported iterate_column_type: {iterate_column_type}')
 
+            message = dict(table_name=target_name, status='extracting', min_max_tuple=str(min_max_tuple))
+            logger.info(message)
+
             if not min_max_tuple:
                 if not last_point:
                     # Empty table, need schema fetc
