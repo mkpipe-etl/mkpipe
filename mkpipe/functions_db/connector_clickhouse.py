@@ -25,9 +25,7 @@ def retry_on_failure(max_attempts=5, delay=1):
                         )
                         time.sleep(delay)
                     else:
-                        logger.error(
-                            {'message': f'Error after {max_attempts} attempts: {e}'}
-                        )
+                        logger.error({'message': f'Error after {max_attempts} attempts: {e}'})
                         raise e
 
         return wrapper
@@ -126,7 +124,7 @@ class ConnectorClickhouse:
             if error_message is not None:
                 update_parts.append(f"error_message = '{error_message}'")
 
-            update_parts.append("updated_time = now()")
+            update_parts.append('updated_time = now()')
 
             update_sql = f"""
                 ALTER TABLE mkpipe_manifest UPDATE {', '.join(update_parts)} WHERE table_name = '{name}'
@@ -150,12 +148,13 @@ class ConnectorClickhouse:
                 """
             )
 
+
 def format_clickhouse_value(val):
     if val is None:
-        return "NULL"
+        return 'NULL'
     elif isinstance(val, str):
         return f"'{val}'"
     elif isinstance(val, (int, float)):
         return str(val)
     else:
-        raise ValueError(f"Unsupported value type: {type(val)}")
+        raise ValueError(f'Unsupported value type: {type(val)}')

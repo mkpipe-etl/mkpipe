@@ -29,9 +29,7 @@ def load_config(config_file=None):
 
     with config_path.open('r') as f:
         data = yaml.safe_load(f)
-        ENV = data.get(
-            'default_environment', 'prod'
-        )  # Default to 'prod' if not specified
+        ENV = data.get('default_environment', 'prod')  # Default to 'prod' if not specified
         env_config = data.get(ENV, {})
 
     return env_config

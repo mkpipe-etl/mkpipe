@@ -58,9 +58,7 @@ class Logger:
             if not os.path.exists(path):
                 os.makedirs(path)
             file_path = os.path.abspath(
-                os.path.join(
-                    path, f'{pod_name}_log.log'
-                )  # Use pod name for unique log file
+                os.path.join(path, f'{pod_name}_log.log')  # Use pod name for unique log file
             )
 
             fh = logging.handlers.TimedRotatingFileHandler(
@@ -143,9 +141,7 @@ def log_container(name):
                 return result
 
             except Exception as e:
-                message = {
-                    'message': str(e) + str(traceback.format_exc()).replace('\n', ' ')
-                }
+                message = {'message': str(e) + str(traceback.format_exc()).replace('\n', ' ')}
                 logger.error(message)
                 raise
 

@@ -28,9 +28,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
 
     settings_values = get_config_value(['settings'], file_name=config_file_name)
     settings = PipeSettings(ROOT_DIR=str(ROOT_DIR), **settings_values)
-    run_coordinator = get_config_value(
-        ['settings', 'run_coordinator'], file_name=config_file_name
-    )
+    run_coordinator = get_config_value(['settings', 'run_coordinator'], file_name=config_file_name)
 
     # Validate that pipeline_name_set and table_name_set are sets
     if pipeline_name_set and not isinstance(pipeline_name_set, set):

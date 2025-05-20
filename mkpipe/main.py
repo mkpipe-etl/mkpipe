@@ -22,9 +22,7 @@ def run(config):
     )
     if not os.path.exists(config_file):
         click.echo(f'Error: Configuration file not found: {config_file}')
-        click.echo(
-            'Set the MKPIPE_PROJECT_DIR environment variable or use the --config option.'
-        )
+        click.echo('Set the MKPIPE_PROJECT_DIR environment variable or use the --config option.')
         return
 
     click.echo(f'Running mkpipe pipeline with configuration: {config_file}')

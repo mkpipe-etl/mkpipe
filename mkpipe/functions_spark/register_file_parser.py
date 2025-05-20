@@ -1,4 +1,4 @@
-from .parquet_functions import create_spark_session
+from .session import create_spark_session
 
 PARSERS = {}
 

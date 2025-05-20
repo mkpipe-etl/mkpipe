@@ -12,48 +12,26 @@ from ..utils import Logger
 logger = Logger(__file__)
 
 # Determine whether to initialize Celery based on the run_coordinator value
-run_coordinator = get_config_value(
-    ['settings', 'run_coordinator'], file_name=CONFIG_FILE
-)
+run_coordinator = get_config_value(['settings', 'run_coordinator'], file_name=CONFIG_FILE)
 
 if run_coordinator == 'celery':
     # Celery app configuration
-    broker_type = get_config_value(
-        ['settings', 'broker', 'broker_type'], file_name=CONFIG_FILE
-    )
-    broker_host = get_config_value(
-        ['settings', 'broker', 'host'], file_name=CONFIG_FILE
-    )
-    broker_port = get_config_value(
-        ['settings', 'broker', 'port'], file_name=CONFIG_FILE
-    )
-    broker_user = get_config_value(
-        ['settings', 'broker', 'user'], file_name=CONFIG_FILE
-    )
-    broker_password = get_config_value(
-        ['settings', 'broker', 'password'], file_name=CONFIG_FILE
+    broker_type = get_config_value(['settings', 'broker', 'broker_type'], file_name=CONFIG_FILE)
+    broker_host = get_config_value(['settings', 'broker', 'host'], file_name=CONFIG_FILE)
+    broker_port = get_config_value(['settings', 'broker', 'port'], file_name=CONFIG_FILE)
+    broker_user = get_config_value(['settings', 'broker', 'user'], file_name=CONFIG_FILE)
+    broker_password = get_config_value(['settings', 'broker', 'password'], file_name=CONFIG_FILE)
+
+    CELERY_BROKER_URL = (
+        f'amqp://{broker_user}:{quote_plus(str(broker_password))}@{broker_host}:{broker_port}//'
     )
 
-    CELERY_BROKER_URL = f'amqp://{broker_user}:{quote_plus(str(broker_password))}@{broker_host}:{broker_port}//'
-
-    backend_type = get_config_value(
-        ['settings', 'backend', 'database_type'], file_name=CONFIG_FILE
-    )
-    backend_host = get_config_value(
-        ['settings', 'backend', 'host'], file_name=CONFIG_FILE
-    )
-    backend_port = get_config_value(
-        ['settings', 'backend', 'port'], file_name=CONFIG_FILE
-    )
-    backend_user = get_config_value(
-        ['settings', 'backend', 'user'], file_name=CONFIG_FILE
-    )
-    backend_password = get_config_value(
-        ['settings', 'backend', 'password'], file_name=CONFIG_FILE
-    )
-    backend_database = get_config_value(
-        ['settings', 'backend', 'database'], file_name=CONFIG_FILE
-    )
+    backend_type = get_config_value(['settings', 'backend', 'database_type'], file_name=CONFIG_FILE)
+    backend_host = get_config_value(['settings', 'backend', 'host'], file_name=CONFIG_FILE)
+    backend_port = get_config_value(['settings', 'backend', 'port'], file_name=CONFIG_FILE)
+    backend_user = get_config_value(['settings', 'backend', 'user'], file_name=CONFIG_FILE)
+    backend_password = get_config_value(['settings', 'backend', 'password'], file_name=CONFIG_FILE)
+    backend_database = get_config_value(['settings', 'backend', 'database'], file_name=CONFIG_FILE)
 
     CELERY_BACKEND_URL = f'db+{backend_type}://{backend_user}:{quote_plus(str(backend_password))}@{backend_host}:{backend_port}/{backend_database}'
 

@@ -36,9 +36,7 @@ def retry_on_failure(max_attempts=5, delay=1):
                         )
                         time.sleep(delay)
                     else:
-                        logger.error(
-                            {'message': f'Error after {max_attempts} attempts: {e}'}
-                        )
+                        logger.error({'message': f'Error after {max_attempts} attempts: {e}'})
                         raise e
 
         return wrapper

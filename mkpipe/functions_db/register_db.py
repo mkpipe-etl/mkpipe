@@ -33,6 +33,7 @@ def connector_duckdb(connection_params):
 def connector_clickhouse(connection_params):
     return ConnectorClickhouse(connection_params)
 
+
 def get_db_connector(variant):
     if variant not in DB_CONNECTIONS:
         raise ValueError(f'Unsupported connector type: {variant}')
