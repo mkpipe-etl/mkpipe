@@ -239,7 +239,7 @@ class BaseExtractor:
 
                 count_col = len(df.columns)
                 count_row = df.count()
-                last_point_value = max_filter
+                last_point_value = str(max_filter)
 
                 # Update `data` for this iteration
                 data['last_point_value'] = last_point_value  # update with the new max
