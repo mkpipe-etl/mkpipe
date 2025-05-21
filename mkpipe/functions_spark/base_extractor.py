@@ -126,15 +126,20 @@ class BaseExtractor:
 
                 min_max_tuple = []
                 start = min_val
-                for _ in range(chunk_count_for_partition):
+                for i in range(chunk_count_for_partition):
                     step_with_remainder = step
                     if remainder > 0:
                         step_with_remainder += 1
                         remainder -= 1
-                    end = start + datetime.timedelta(seconds=step_with_remainder - 1)
-                    if start <= max_val:
-                        min_max_tuple.append((start, min(end, max_val)))
-                        start = end + datetime.timedelta(seconds=1)
+
+                    if i == chunk_count_for_partition - 1:
+                        # ✅ Force the final chunk to end exactly at max_val
+                        end = max_val
+                    else:
+                        end = start + datetime.timedelta(microseconds=step_with_remainder - 1)
+
+                    min_max_tuple.append((start, end))
+                    start = end + datetime.timedelta(microseconds=1)
             else:
                 raise ValueError(f'Unsupported iterate_column_type: {iterate_column_type}')
 
