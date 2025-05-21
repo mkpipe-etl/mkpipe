@@ -138,9 +138,6 @@ class BaseExtractor:
             else:
                 raise ValueError(f'Unsupported iterate_column_type: {iterate_column_type}')
 
-            message = dict(table_name=target_name, status='extracting', min_max_tuple=str(min_max_tuple))
-            logger.info(message)
-
             if not min_max_tuple:
                 if not last_point:
                     # Empty table, need schema fetc
@@ -191,8 +188,8 @@ class BaseExtractor:
                     else:
                         updated_query = f'(SELECT * from {name} where {partitions_column} >= {min_filter} and {partitions_column} <= {max_filter}) q'
                 elif iterate_column_type == 'datetime':
-                    min_filter = chunk[0].strftime('%Y-%m-%d %H:%M:%S')
-                    max_filter = chunk[-1].strftime('%Y-%m-%d %H:%M:%S')
+                    min_filter = chunk[0].strftime('%Y-%m-%d %H:%M:%S.%f')
+                    max_filter = chunk[-1].strftime('%Y-%m-%d %H:%M:%S.%f')
                     if custom_query:
                         updated_query = custom_query.replace(
                             '{query_filter}',
@@ -202,6 +199,17 @@ class BaseExtractor:
                         updated_query = f"""(SELECT * from {name} where  {partitions_column} >= '{min_filter}' and {partitions_column} <= '{max_filter}') q"""
                 else:
                     raise ValueError(f'Unsupported iterate_column_type: {iterate_column_type}')
+
+                message = dict(
+                    table_name=target_name,
+                    status='extracting',
+                    min_filter=str(min_filter),
+                    max_filter=str(max_filter),
+                    min_max_tuple=str(min_max_tuple),
+                    target_name=target_name,
+                    updated_query=updated_query,
+                )
+                logger.info(message)
 
                 df = (
                     spark.read.format('jdbc')

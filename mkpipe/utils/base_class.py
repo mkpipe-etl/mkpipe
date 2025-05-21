@@ -7,7 +7,7 @@ class PipeSettings(BaseModel):
     compression_codec: str = 'zstd'  # Options: snappy, gzip, zstd, lz4, none
     spark_driver_memory: str = '4g'
     spark_executor_memory: str = '3g'
-    partitions_count: int = 2
+    partitions_count: int = 1
     default_iterate_max_loop: int = 1000
     default_chunk_count_for_partition: int = 1
     ROOT_DIR: str
