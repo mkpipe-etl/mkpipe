@@ -23,6 +23,9 @@ class BaseExtractor:
         self.password = self.build_passord()
         self.database = self.connection_params['database']
         self.schema = self.connection_params.get('schema', None)
+        self.warehouse = self.connection_params.get('warehouse', None)
+        self.private_key_file = self.connection_params.get('private_key_file', None)
+        self.private_key_file_pwd = self.connection_params.get('private_key_file_pwd', None)
 
         self.driver_name = driver_name
         self.driver_jdbc = driver_jdbc
