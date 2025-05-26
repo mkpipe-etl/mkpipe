@@ -1,6 +1,7 @@
 import time
 from urllib.parse import quote_plus
 from pyspark.sql import functions as F
+from pyspark.sql.types import TimestampType
 
 from .parquet_functions import remove_partitioned_parquet
 from .register_file_parser import get_parser
@@ -51,9 +52,41 @@ class BaseLoader:
     def add_custom_columns(self, df, elt_start_time):
         if 'etl_time' in df.columns:
             df = df.drop('etl_time')
-
-        df = df.withColumn('etl_time', F.lit(elt_start_time))
+        df = df.withColumn('etl_time', F.lit(elt_start_time).cast(TimestampType()))
         return df
+    
+    def write_df(self, df, write_mode, table_name, batchsize):
+        (
+            df.write.format('jdbc')
+            .mode(write_mode)  # Use write_mode for the first iteration, 'append' for others
+            .option('url', self.jdbc_url)
+            .option('dbtable', table_name)
+            .option('driver', self.driver_jdbc)
+            .option('batchsize', batchsize)
+            .save()
+        )
+
+        """
+        for index in range(df.rdd.getNumPartitions()):
+            # Filter the DataFrame by partition index
+            partition_df = df.filter(F.spark_partition_id() == index)
+
+            # Determine the correct write mode (use write_mode for the first iteration, 'append' for others)
+            current_write_mode = write_mode if index == 0 else 'append'
+
+            (
+                partition_df.write.format('jdbc')
+                .mode(
+                    current_write_mode
+                )  # Use write_mode for the first iteration, 'append' for others
+                .option('url', self.jdbc_url)
+                .option('dbtable', name)
+                .option('driver', self.driver_jdbc)
+                .option('batchsize', batchsize)
+                .save()
+            )
+        """
+        return
 
     @log_container(__file__)
     def load(self, data, elt_start_time):
@@ -100,37 +133,8 @@ class BaseLoader:
             )
             logger.info(message)
 
-            (
-                df.write.format('jdbc')
-                .mode(write_mode)  # Use write_mode for the first iteration, 'append' for others
-                .option('url', self.jdbc_url)
-                .option('dbtable', name)
-                .option('driver', self.driver_jdbc)
-                .option('batchsize', batchsize)
-                .save()
-            )
-
-            """
-            for index in range(df.rdd.getNumPartitions()):
-                # Filter the DataFrame by partition index
-                partition_df = df.filter(F.spark_partition_id() == index)
-
-                # Determine the correct write mode (use write_mode for the first iteration, 'append' for others)
-                current_write_mode = write_mode if index == 0 else 'append'
-
-                (
-                    partition_df.write.format('jdbc')
-                    .mode(
-                        current_write_mode
-                    )  # Use write_mode for the first iteration, 'append' for others
-                    .option('url', self.jdbc_url)
-                    .option('dbtable', name)
-                    .option('driver', self.driver_jdbc)
-                    .option('batchsize', batchsize)
-                    .save()
-                )
-            """
-
+            self.write_df(df=df, write_mode=write_mode, table_name=name, batchsize=batchsize)
+            
             # Update last point in the mkpipe_manifest table if applicable
             self.backend.manifest_table_update(
                 name=name,
