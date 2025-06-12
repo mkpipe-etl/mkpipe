@@ -12,22 +12,23 @@ prod:
     default_chunk_count_for_partition: 1
 
     backend:
-      database_type: sqlite
+      variant: sqlite
 
   connections:
     source:
+      variant: sqlite
       host: localhost
       port: 3306
       database: db
       user: user
       password: password
     destination:
+      variant: sqlite 
       db_path: /home/mk/codes/project_mkpipe/mkpipe/tests/readed_sqlite_data.db
 
 
   extractors:
     extract_data:
-      variant: sqlite
       config:
         connection_ref: source
         tables:
@@ -39,7 +40,6 @@ prod:
 
   loaders:
     load_data:
-      variant: sqlite 
       config:
         connection_ref: destination
 

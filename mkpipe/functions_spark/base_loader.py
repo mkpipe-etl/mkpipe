@@ -36,7 +36,7 @@ class BaseLoader:
 
         config = load_config()
         connection_params = config['settings']['backend']
-        db_type = connection_params['database_type']
+        db_type = connection_params['variant']
         self.backend = get_db_connector(db_type)(connection_params)
 
     def build_jdbc_url(self):

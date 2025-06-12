@@ -26,7 +26,7 @@ if run_coordinator == 'celery':
         f'amqp://{broker_user}:{quote_plus(str(broker_password))}@{broker_host}:{broker_port}//'
     )
 
-    backend_type = get_config_value(['settings', 'backend', 'database_type'], file_name=CONFIG_FILE)
+    backend_type = get_config_value(['settings', 'backend', 'variant'], file_name=CONFIG_FILE)
     backend_host = get_config_value(['settings', 'backend', 'host'], file_name=CONFIG_FILE)
     backend_port = get_config_value(['settings', 'backend', 'port'], file_name=CONFIG_FILE)
     backend_user = get_config_value(['settings', 'backend', 'user'], file_name=CONFIG_FILE)

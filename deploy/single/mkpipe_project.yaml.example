@@ -10,13 +10,14 @@ prod:
     spark_driver_memory: '4g'
     spark_executor_memory: '3g'
     default_iterate_max_loop: 1000
-    default_chunk_count_for_partition: 500000
+    default_chunk_count_for_partition: 1 
     
     backend:
-      database_type: sqlite
+      variant: sqlite
 
   connections:
     source_pfmegrnargs:
+      variant: postgresql
       host: hh-pgsql-public.ebi.ac.uk
       port: 5432
       database: pfmegrnargs
@@ -24,6 +25,7 @@ prod:
       user: reader
       password: NWDMCE5xdipIjRrp
     destination:
+      variant: mysql
       host: db
       port: 3306
       database: db
@@ -33,7 +35,6 @@ prod:
   extractors:
     extract_pfmegrnargs_data:
       description: null
-      variant: postgresql
       config:
         connection_ref: source_pfmegrnargs
         tables:
@@ -50,7 +51,6 @@ prod:
           #   target_name: raw_litscan_sentence_id_counts
     extract_mysql:
       description: null
-      variant: mysql
       config:
         connection_ref: destination
         tables:
@@ -59,7 +59,6 @@ prod:
 
   loaders:
     load_to_stage:
-      variant: mysql 
       config:
         connection_ref: destination
 

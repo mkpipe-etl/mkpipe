@@ -19,7 +19,7 @@ prod:
       host: rabbitmq
       port: 5672
     backend:
-      database_type: postgresql
+      variant: postgresql
       host: db 
       port: 5432
       database: postgres
@@ -29,6 +29,7 @@ prod:
 
   connections:
     destination_dwh_postgres:
+      variant: postgresql
       host: db
       port: 5432
       database: postgres
@@ -36,6 +37,7 @@ prod:
       user: postgres
       password: postgres
     source_pfmegrnargs_postgresql:
+      variant: postgresql
       host: hh-pgsql-public.ebi.ac.uk
       port: 5432
       database: pfmegrnargs
@@ -52,7 +54,6 @@ prod:
   extractors:
     extract_pfmegrnargs_data:
       description: null
-      variant: postgresql
       config:
         connection_ref: source_pfmegrnargs_postgresql
         tables:
@@ -64,7 +65,6 @@ prod:
 
     # extract_from_mysql:
     #   description: null
-    #   variant: mysql 
     #   config:
     #     connection_ref: source_mysql
     #     tables:
@@ -78,11 +78,9 @@ prod:
     load_to_stage:
       config:
         connection_ref: destination_dwh_postgres
-      variant: postgresql
     # load_to_mysql:
     #   config:
     #     connection_ref: source_mysql 
-    #   variant: mysql
 
   jobs:
     - name: pfmegrnargs 

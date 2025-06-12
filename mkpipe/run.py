@@ -60,8 +60,8 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
         # Loader Configuration
         try:
             loader_conf = DATA['loaders'][load_task]['config']
-            loader_variant = DATA['loaders'][load_task]['variant']
             connection_params = DATA['connections'][loader_conf['connection_ref']]
+            loader_variant = connection_params['variant']
             loader_conf['connection_params'] = connection_params
 
         except KeyError as e:
@@ -76,8 +76,8 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
         # Extractor Configuration
         try:
             extractor_conf = DATA['extractors'][extract_task]['config']
-            extractor_variant = DATA['extractors'][extract_task]['variant']
             connection_params = DATA['connections'][extractor_conf['connection_ref']]
+            extractor_variant = connection_params['variant']
             extractor_conf['connection_params'] = connection_params
         except KeyError as e:
             logger.info(
