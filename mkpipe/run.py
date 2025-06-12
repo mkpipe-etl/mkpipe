@@ -95,18 +95,22 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
                 continue
 
             # Copy the extractor config for the current table
-            current_table_conf = extractor_conf.copy()
-            current_table_conf['table'] = table  # Add the specific table
-            current_table_conf.pop('tables', None)
+            table_extract_conf = extractor_conf.copy()
+            table_extract_conf['table'] = table
+            table_extract_conf.pop('tables', None)
+
+            table_load_conf = loader_conf.copy()
+            table_load_conf['table'] = table
+            table_load_conf.pop('tables', None)
 
             # Get the adjusted priority level for the current pipeline
             priority = get_priority(pipeline_name, priority, custom_priority)
 
             task = InputTask(
                 extractor_variant=extractor_variant,
-                current_table_conf=current_table_conf,
+                table_extract_conf=table_extract_conf,
                 loader_variant=loader_variant,
-                loader_conf=loader_conf,
+                table_load_conf=table_load_conf,
                 priority=custom_priority,
                 settings=settings,
             )

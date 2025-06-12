@@ -54,7 +54,7 @@ class BaseLoader:
             df = df.drop('etl_time')
         df = df.withColumn('etl_time', F.lit(elt_start_time).cast(TimestampType()))
         return df
-    
+
     def write_df(self, df, write_mode, table_name, batchsize):
         (
             df.write.format('jdbc')
@@ -134,7 +134,7 @@ class BaseLoader:
             logger.info(message)
 
             self.write_df(df=df, write_mode=write_mode, table_name=name, batchsize=batchsize)
-            
+
             # Update last point in the mkpipe_manifest table if applicable
             self.backend.manifest_table_update(
                 name=name,

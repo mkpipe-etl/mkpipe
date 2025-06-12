@@ -79,19 +79,19 @@ if run_coordinator == 'celery':
     )
     def extract_data(self_task, **kwargs):
         extractor_variant = kwargs['extractor_variant']
-        current_table_conf = kwargs['current_table_conf']
+        table_extract_conf = kwargs['table_extract_conf']
         loader_variant = kwargs['loader_variant']
-        loader_conf = kwargs['loader_conf']
+        table_load_conf = kwargs['table_load_conf']
         settings = kwargs['settings']
 
-        extractor = get_extractor(extractor_variant)(current_table_conf, settings)
+        extractor = get_extractor(extractor_variant)(table_extract_conf, settings)
         data = extractor.extract()
 
         if data:
             load_data.apply_async(
                 kwargs={
                     'loader_variant': loader_variant,
-                    'loader_conf': loader_conf,
+                    'table_load_conf': table_load_conf,
                     'data': data,
                     'settings': settings,
                 },
@@ -113,11 +113,11 @@ if run_coordinator == 'celery':
     )
     def load_data(self_task, **kwargs):
         loader_variant = kwargs['loader_variant']
-        loader_conf = kwargs['loader_conf']
+        table_load_conf = kwargs['table_load_conf']
         settings = kwargs['settings']
         data = kwargs['data']
 
-        loader = get_loader(loader_variant)(loader_conf, settings)
+        loader = get_loader(loader_variant)(table_load_conf, settings)
         elt_start_time = datetime.datetime.now()
         loader.load(data, elt_start_time)
 
@@ -163,9 +163,9 @@ class CoordinatorCelery:
             celery_task_group.append(
                 extract_data.s(
                     extractor_variant=task.extractor_variant,
-                    current_table_conf=task.current_table_conf,
+                    table_extract_conf=task.table_extract_conf,
                     loader_variant=task.loader_variant,
-                    loader_conf=task.loader_conf,
+                    table_load_conf=task.table_load_conf,
                     settings=task.settings.dict(),
                 ).set(
                     priority=task.priority,
