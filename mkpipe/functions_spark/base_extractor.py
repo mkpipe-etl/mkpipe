@@ -90,7 +90,7 @@ class BaseExtractor:
                 write_mode = 'overwrite'
                 iterate_query = f"""(SELECT min({partitions_column}) as min_val, max({partitions_column}) as max_val from {name}) q"""
 
-            df_itarate_list = (
+            df_iterate_list = (
                 spark.read.format('jdbc')
                 .option('url', self.jdbc_url)
                 .option('dbtable', iterate_query)
@@ -98,8 +98,8 @@ class BaseExtractor:
                 .option('fetchsize', fetchsize)
                 .load()
             )
-            min_val = df_itarate_list.first()['min_val']
-            max_val = df_itarate_list.first()['max_val']
+            min_val = df_iterate_list.first()[0]
+            max_val = df_iterate_list.first()[1]
 
             if min_val is None or max_val is None:
                 min_max_tuple = None
