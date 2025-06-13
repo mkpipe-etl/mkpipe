@@ -41,7 +41,7 @@ class BaseExtractor:
         return f'jdbc:{self.driver_name}://{self.host}:{self.port}/{self.database}?user={self.username}&password={self.password}'
 
     def build_passord(self):
-        return quote_plus(str(self.connection_params['password']))
+        return quote_plus(str(self.connection_params.get('password', None)))
 
     def normalize_partitions_column(self, col: str):
         return col.split(' as ')[0].strip()
