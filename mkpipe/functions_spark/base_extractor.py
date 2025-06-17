@@ -177,7 +177,7 @@ class BaseExtractor:
             }
 
             for index, chunk in enumerate(min_max_tuple):
-                if iterate_max_loop == index:
+                if iterate_max_loop is not None and iterate_max_loop == index:
                     break
 
                 if index == 0:
