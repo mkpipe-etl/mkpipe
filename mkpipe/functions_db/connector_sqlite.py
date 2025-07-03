@@ -6,8 +6,6 @@ from functools import wraps
 from ..utils import Logger
 from ..config import ROOT_DIR
 
-logger = Logger(__file__)
-
 
 def retry_on_failure(max_attempts=5, delay=1):
     """
@@ -22,6 +20,8 @@ def retry_on_failure(max_attempts=5, delay=1):
     """
 
     def decorator(func):
+        logger = Logger(__file__)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             attempts = 0

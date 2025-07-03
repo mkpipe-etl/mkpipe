@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 from functools import wraps
 from ..utils import Logger
 
-logger = Logger(__file__)
-
 
 def retry_on_failure(max_attempts=5, delay=1):
+    logger = Logger(__file__)
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):

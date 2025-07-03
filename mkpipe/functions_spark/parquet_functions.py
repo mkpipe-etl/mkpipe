@@ -5,8 +5,6 @@ from pyspark.sql.types import StructType
 from ..config import ROOT_DIR
 from ..utils import Logger
 
-logger = Logger(__file__)
-
 
 def remove_partitioned_parquet(directory_path):
     """
@@ -14,6 +12,7 @@ def remove_partitioned_parquet(directory_path):
 
     :param directory_path: The root directory of the partitioned Parquet files to delete.
     """
+    logger = Logger(__file__)
     try:
         # Check if the directory exists
         if os.path.exists(directory_path) and os.path.isdir(directory_path):

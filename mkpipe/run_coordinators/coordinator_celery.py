@@ -9,12 +9,12 @@ from ..config import CONFIG_FILE, get_config_value
 from ..plugins import get_extractor, get_loader
 from ..utils import Logger
 
-logger = Logger(__file__)
 
 # Determine whether to initialize Celery based on the run_coordinator value
 run_coordinator = get_config_value(['settings', 'run_coordinator'], file_name=CONFIG_FILE)
 
 if run_coordinator == 'celery':
+    logger = Logger(__file__)
     # Celery app configuration
     broker_type = get_config_value(['settings', 'broker', 'broker_type'], file_name=CONFIG_FILE)
     broker_host = get_config_value(['settings', 'broker', 'host'], file_name=CONFIG_FILE)
@@ -152,6 +152,7 @@ else:
 
 class CoordinatorCelery:
     def __init__(self, task_group):
+        self.logger = Logger(__file__)
         self.task_group = task_group
 
     def run(self):
@@ -177,4 +178,4 @@ class CoordinatorCelery:
 
         if celery_task_group:
             run_parallel_tasks(celery_task_group)
-            logger.info({'message': 'Tasks have been sended to the Celery Queue!'})
+            self.logger.info({'message': 'Tasks have been sended to the Celery Queue!'})
