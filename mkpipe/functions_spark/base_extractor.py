@@ -17,11 +17,11 @@ class BaseExtractor:
         self.connection_params = config['connection_params']
         self.table = config['table']
         self.pass_on_error = config.get('pass_on_error', None)
-        self.host = self.connection_params['host']
-        self.port = self.connection_params['port']
-        self.username = self.connection_params['user']
+        self.host = self.connection_params.get('host', None)
+        self.port = self.connection_params.get('port', None)
+        self.username = self.connection_params.get('user', None)
         self.password = self.build_passord()
-        self.database = self.connection_params['database']
+        self.database = self.connection_params.get('database', None)
         self.schema = self.connection_params.get('schema', None)
         self.warehouse = self.connection_params.get('warehouse', None)
         self.private_key_file = self.connection_params.get('private_key_file', None)
