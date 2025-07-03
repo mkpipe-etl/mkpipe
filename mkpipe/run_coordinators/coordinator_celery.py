@@ -62,7 +62,7 @@ if run_coordinator == 'celery':
         task_retry_limit=3,
         task_retry_backoff=True,
         task_retry_backoff_jitter=True,
-        result_expires=3600,
+        result_expires=24*3600,
         result_chord_retry_interval=60,
         broker_connection_retry_on_startup=True,
         worker_direct=True,
