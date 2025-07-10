@@ -1,4 +1,5 @@
 import os
+import gc
 import datetime
 from urllib.parse import quote_plus
 
@@ -259,6 +260,8 @@ class BaseExtractor:
                 )
                 logger.info(message)
             logger.info(data)
+            df.unpersist()
+            gc.collect()
             return data
         finally:
             # Ensure Spark session is closed
@@ -374,6 +377,8 @@ class BaseExtractor:
                 meta_data=data,
             )
             logger.info(message)
+            df.unpersist()
+            gc.collect()
             return data
         finally:
             # Ensure Spark session is closed

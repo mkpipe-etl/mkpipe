@@ -2,6 +2,7 @@ import time
 from urllib.parse import quote_plus
 from pyspark.sql import functions as F
 from pyspark.sql.types import TimestampType
+import gc
 
 from .parquet_functions import remove_partitioned_parquet
 from .register_file_parser import get_parser
@@ -65,6 +66,8 @@ class BaseLoader:
             .option('batchsize', batchsize)
             .save()
         )
+        df.unpersist()
+        gc.collect()
 
         """
         for index in range(df.rdd.getNumPartitions()):
