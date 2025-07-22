@@ -8,8 +8,6 @@ prod:
     partitions_count: 2
     spark_driver_memory: "4g"
     spark_executor_memory: "3g"
-    default_iterate_max_loop: 1000
-    default_chunk_count_for_partition: 1
 
     backend:
       variant: sqlite

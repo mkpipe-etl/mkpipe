@@ -68,27 +68,6 @@ class BaseLoader:
         )
         df.unpersist()
         gc.collect()
-
-        """
-        for index in range(df.rdd.getNumPartitions()):
-            # Filter the DataFrame by partition index
-            partition_df = df.filter(F.spark_partition_id() == index)
-
-            # Determine the correct write mode (use write_mode for the first iteration, 'append' for others)
-            current_write_mode = write_mode if index == 0 else 'append'
-
-            (
-                partition_df.write.format('jdbc')
-                .mode(
-                    current_write_mode
-                )  # Use write_mode for the first iteration, 'append' for others
-                .option('url', self.jdbc_url)
-                .option('dbtable', name)
-                .option('driver', self.driver_jdbc)
-                .option('batchsize', batchsize)
-                .save()
-            )
-        """
         return
 
     @log_container(__file__)
@@ -96,38 +75,28 @@ class BaseLoader:
         try:
             logger = Logger(__file__)
             start_time = time.time()
-            name = data['table_name']
+
+            t = self.table
+            name = t['target_name']
+            iterate_column_type = t['iterate_column_type']
+            batchsize = t.get('batchsize', 100_000)
+            replication_method = t.get('replication_method', 'full')
 
             write_mode = data.get('write_mode', None)
-            file_type = data.get('file_type', None)
             last_point_value = data.get('last_point_value', None)
-            iterate_column_type = data.get('iterate_column_type', None)
-            replication_method = data.get('replication_method', 'full')
-            batchsize = data.get('fetchsize', 100_000)
-            pass_on_error = data.get('pass_on_error', None)
+            df = data['df']
 
-            if not file_type:
-                'means that the data fetched before no new data'
+            if not df:
                 self.backend.manifest_table_update(
                     name=name,
-                    value=None,  # Last point remains unchanged
-                    value_type=None,  # Type remains unchanged
-                    status='completed',  # ('completed', 'failed', 'extracting', 'loading')
-                    replication_method=replication_method,  # ('incremental', 'full')
-                    error_message='',
+                    value=last_point_value,
+                    value_type=iterate_column_type,
+                    status='completed',
+                    replication_method=replication_method,
+                    error_message='no new record',
                 )
                 return
 
-            self.backend.manifest_table_update(
-                name=name,
-                value=None,  # Last point remains unchanged
-                value_type=None,  # Type remains unchanged
-                status='loading',  # ('completed', 'failed', 'extracting', 'loading')
-                replication_method=replication_method,  # ('incremental', 'full')
-                error_message='',
-            )
-
-            df = get_parser(file_type)(data, self.settings)
             df = self.add_custom_columns(df, elt_start_time)
             message = dict(
                 table_name=name,
@@ -150,9 +119,6 @@ class BaseLoader:
 
             message = dict(table_name=name, status=write_mode)
             logger.info(message)
-
-            # remove the parquet to reduce the storage
-            remove_partitioned_parquet(data['path'])
 
             run_time = time.time() - start_time
             message = dict(table_name=name, status='success', run_time=run_time)
@@ -177,7 +143,7 @@ class BaseLoader:
                 error_message=str(e),
             )
 
-            if pass_on_error:
+            if self.pass_on_error:
                 logger.warning(message)
                 return
             else:

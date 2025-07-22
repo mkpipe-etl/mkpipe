@@ -8,14 +8,12 @@ def create_spark_session(settings):
 
     # --- Safely append the flag to existing Java options ---
     driver_java_options = (
-        f"-Duser.timezone={settings.timezone} "
-        "-XX:ErrorFile=/tmp/java_error%p.log "
-        "-XX:HeapDumpPath=/tmp "
+        f'-Duser.timezone={settings.timezone} '
+        '-XX:ErrorFile=/tmp/java_error%p.log '
+        '-XX:HeapDumpPath=/tmp '
     )
 
-    executor_java_options = (
-        f"-Duser.timezone={settings.timezone} "
-    )
+    executor_java_options = f'-Duser.timezone={settings.timezone} '
 
     conf = SparkConf()
     conf.setAppName(settings.driver_name)
@@ -44,7 +42,21 @@ def create_spark_session(settings):
     conf.set('spark.driver.extraJavaOptions', driver_java_options)
     conf.set('spark.executor.extraJavaOptions', executor_java_options)
 
+    # Add JDBC-specific logging configurations
+    conf.set('spark.sql.sources.bucketing.enabled', 'true')
+    conf.set('spark.sql.shuffle.partitions', '4')  # Reduce for local mode
+    conf.set('spark.logConf', 'true')
+
+    # PostgreSQL JDBC driver logging
+    conf.set('spark.jdbc.log.enabled', 'true')
+    conf.set('spark.jdbc.log.level', 'DEBUG')  # TRACE for maximum verbosity
+
     # Build the SparkSession
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
+
+    logger = spark._jvm.org.apache.log4j
+    logger.LogManager.getLogger('org.apache.spark.sql.execution.datasources.jdbc').setLevel(
+        logger.Level.DEBUG
+    )
 
     return spark
