@@ -84,6 +84,15 @@ class BaseLoader:
             last_point_value = data.get('last_point_value', None)
             df = data['df']
 
+            self.backend.manifest_table_update(
+                name=name,
+                value=None,
+                value_type=None,
+                status='loading',
+                replication_method=replication_method,
+                error_message='',
+            )
+
             if not df:
                 self.backend.manifest_table_update(
                     name=name,
@@ -105,7 +114,6 @@ class BaseLoader:
 
             self.write_df(df=df, write_mode=write_mode, table_name=name, batchsize=batchsize)
 
-            # Update last point in the mkpipe_manifest table if applicable
             self.backend.manifest_table_update(
                 name=name,
                 value=last_point_value,
@@ -123,7 +131,6 @@ class BaseLoader:
             logger.info(message)
 
         except Exception as e:
-            # Log the error message and update the mkpipe_manifest with the error details
             message = dict(
                 table_name=name,
                 status='failed',
