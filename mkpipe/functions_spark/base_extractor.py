@@ -72,8 +72,6 @@ class BaseExtractor:
             p_col_name = partitions_column_.split(' as ')[-1].strip()
 
             last_point = self.backend.get_last_point(target_name)
-            # write_mode = 'overwrite'
-            write_mode = 'append'
             iterate_query = f"""
                 select 
                     min({partitions_column}) as min_val, 
@@ -85,6 +83,10 @@ class BaseExtractor:
                 iterate_query = (
                     iterate_query + f""" {name} where {partitions_column} > '{last_point}' """
                 )
+                write_mode = 'append'
+            else:
+                write_mode = 'overwrite'
+            
 
             df_iterate_list = (
                 spark.read.format('jdbc')
