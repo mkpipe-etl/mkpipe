@@ -15,8 +15,8 @@ def parse_parquet(data, settings):
     file_path = data['path']
     spark = create_spark_session(settings)
     df = spark.read.parquet(file_path)
-    # custom_partition_count = data.get('partition_count', settings.partitions_count)
-    # df = spark.read.parquet(file_path).repartition(custom_partition_count)
+    # custom_partitions_count = data.get('partitions_count', settings.partitions_count)
+    # df = spark.read.parquet(file_path).repartition(custom_partitions_count)
     return df
 
 

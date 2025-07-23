@@ -108,7 +108,7 @@ class BaseLoader:
             message = dict(
                 table_name=name,
                 status='loading',
-                total_partition_count=df.rdd.getNumPartitions(),
+                total_partitions_count=df.rdd.getNumPartitions(),
             )
             logger.info(message)
 

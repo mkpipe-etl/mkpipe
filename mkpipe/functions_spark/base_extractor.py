@@ -64,7 +64,7 @@ class BaseExtractor:
                 with open(custom_query_file_path, 'r') as f:
                     custom_query = f.read()
 
-            custom_partition_count = t.get('partition_count', self.settings.partitions_count)
+            custom_partitions_count = t.get('partitions_count', self.settings.partitions_count)
             partitions_column_ = t.get('partitions_column')
             fetchsize = t.get('fetchsize', 100_000)
 
@@ -138,7 +138,7 @@ class BaseExtractor:
                 .option('url', self.jdbc_url)
                 .option('dbtable', updated_query)
                 .option('driver', self.driver_jdbc)
-                .option('numPartitions', custom_partition_count)
+                .option('numPartitions', custom_partitions_count)
                 .option('partitionColumn', p_col_name)
                 .option('lowerBound', min_val)
                 .option('upperBound', max_val)
@@ -160,7 +160,7 @@ class BaseExtractor:
             target_name = t['target_name']
             message = dict(table_name=target_name, status='extracting')
             logger.info(message)
-            custom_partition_count = t.get('partition_count', self.settings.partitions_count)
+            custom_partitions_count = t.get('partitions_count', self.settings.partitions_count)
             fetchsize = t.get('fetchsize', 100_000)
             partitions_column_ = t.get('partitions_column', None)
 
@@ -223,7 +223,7 @@ class BaseExtractor:
                         .option('url', self.jdbc_url)
                         .option('dbtable', updated_query)
                         .option('driver', self.driver_jdbc)
-                        .option('numPartitions', custom_partition_count)
+                        .option('numPartitions', custom_partitions_count)
                         .option('partitionColumn', p_col_name)
                         .option('lowerBound', min_val)
                         .option('upperBound', max_val)
