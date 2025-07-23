@@ -111,8 +111,8 @@ class BaseExtractor:
                     return data
 
             if iterate_column_type == 'int':
-                min_filter = int(min_val)
-                max_filter = int(max_val)
+                min_filter = int(float(min_val))
+                max_filter = int(float(max_val))
                 if custom_query:
                     updated_query = custom_query.replace(
                         '{query_filter}',
