@@ -111,8 +111,8 @@ class BaseExtractor:
                     return data
 
             if iterate_column_type == 'int':
-                min_filter = int(float(min_val))
-                max_filter = int(float(max_val))
+                min_filter = int(min_val)
+                max_filter = int(max_val)
                 if custom_query:
                     updated_query = custom_query.replace(
                         '{query_filter}',
@@ -140,8 +140,8 @@ class BaseExtractor:
                 .option('driver', self.driver_jdbc)
                 .option('numPartitions', custom_partitions_count)
                 .option('partitionColumn', p_col_name)
-                .option('lowerBound', min_val)
-                .option('upperBound', max_val)
+                .option('lowerBound', min_filter)
+                .option('upperBound', max_filter)
                 .option('fetchsize', fetchsize)
                 .load()
             )
@@ -158,6 +158,7 @@ class BaseExtractor:
         try:
             name = t['name']
             target_name = t['target_name']
+            iterate_column_type = t.get('iterate_column_type', None)
             message = dict(table_name=target_name, status='extracting')
             logger.info(message)
             custom_partitions_count = t.get('partitions_count', self.settings.partitions_count)
@@ -206,6 +207,13 @@ class BaseExtractor:
                 row = df_iterate_list.first()
                 min_val, max_val, record_count = row[0], row[1], row[2]
 
+                if iterate_column_type == 'int':
+                    min_filter = int(min_val)
+                    max_filter = int(max_val)
+                elif iterate_column_type == 'datetime':
+                    min_filter = min_val.strftime('%Y-%m-%d %H:%M:%S.%f')
+                    max_filter = max_val.strftime('%Y-%m-%d %H:%M:%S.%f')
+
                 if not row or record_count == 0:
                     # empty df, we need schema
                     df = (
@@ -225,8 +233,8 @@ class BaseExtractor:
                         .option('driver', self.driver_jdbc)
                         .option('numPartitions', custom_partitions_count)
                         .option('partitionColumn', p_col_name)
-                        .option('lowerBound', min_val)
-                        .option('upperBound', max_val)
+                        .option('lowerBound', min_filter)
+                        .option('upperBound', max_filter)
                         .option('fetchsize', fetchsize)
                         .load()
                     )
