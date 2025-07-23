@@ -4,8 +4,6 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import TimestampType
 import gc
 
-from .parquet_functions import remove_partitioned_parquet
-from .register_file_parser import get_parser
 from ..config import load_config
 from ..utils import log_container, Logger, PipeSettings
 from ..functions_db import get_db_connector

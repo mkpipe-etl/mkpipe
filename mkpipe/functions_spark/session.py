@@ -47,10 +47,6 @@ def create_spark_session(settings):
     conf.set('spark.sql.shuffle.partitions', '4')  # Reduce for local mode
     conf.set('spark.logConf', 'true')
 
-    # PostgreSQL JDBC driver logging
-    conf.set('spark.jdbc.log.enabled', 'true')
-    conf.set('spark.jdbc.log.level', 'DEBUG')  # TRACE for maximum verbosity
-
     # Build the SparkSession
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
 

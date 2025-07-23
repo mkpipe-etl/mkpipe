@@ -1,5 +1,4 @@
 import os
-import gc
 import datetime
 from urllib.parse import quote_plus
 
@@ -261,6 +260,9 @@ class BaseExtractor:
         extract_start_time = datetime.datetime.now()
         logger = Logger(__file__)
         logger.info({'message': 'Extracting data ...'})
+        logger.warning(
+            'Performing full extract of a table or without partition column with incremental table. Can cause OOM errors for large tables.'
+        )
         t = self.table
         try:
             target_name = t['target_name']
