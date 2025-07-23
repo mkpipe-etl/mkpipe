@@ -17,6 +17,7 @@ setup(
         'pysqlite3>=0.5.4',
         'duckdb>=1.2.1',
         'clickhouse-connect>=0.8.16',
+        'psutil>=7.0.0',
     ],
     include_package_data=True,
     entry_points={
