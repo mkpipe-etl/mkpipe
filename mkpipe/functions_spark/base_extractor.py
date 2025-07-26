@@ -63,7 +63,7 @@ class BaseExtractor:
                 )
                 with open(custom_query_file_path, 'r') as f:
                     custom_query = f.read()
-                    
+
             message = dict(table_name=target_name, status='extracting')
             logger.info(message)
 
@@ -89,7 +89,6 @@ class BaseExtractor:
                 write_mode = 'append'
             else:
                 write_mode = 'overwrite'
-            
 
             df_iterate_list = (
                 spark.read.format('jdbc')

@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 import psutil
 
+
 def get_container_memory_limit():
     """Get memory limit from cgroups (for Docker/K8s)"""
     try:
@@ -10,9 +11,11 @@ def get_container_memory_limit():
     except Exception:
         return psutil.virtual_memory().total // (1024 * 1024)
 
+
 total_mem = get_container_memory_limit()
-driver_mem = f"{max(1024, int(total_mem * 0.2))}m"
-executor_mem = f"{max(2048, int(total_mem * 0.6))}m"
+driver_mem = f'{max(1024, int(total_mem * 0.2))}m'
+executor_mem = f'{max(2048, int(total_mem * 0.6))}m'
+
 
 class PipeSettings(BaseModel):
     timezone: str = 'UTC'

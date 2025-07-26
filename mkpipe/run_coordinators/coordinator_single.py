@@ -16,7 +16,7 @@ class CoordinatorSingle:
             loader = get_loader(task.loader_variant)(task.table_load_conf, task.settings)
             elt_start_time = datetime.datetime.now()
             loader.load(task.data, elt_start_time)
-        
+
         self.logger.info({'message': 'Extract-Load is successfull!'})
         return True
 
