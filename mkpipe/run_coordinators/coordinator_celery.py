@@ -53,8 +53,7 @@ if run_coordinator == 'celery':
             ),
         ),
         task_routes={
-            'elt.celery_app.extract_data': {'queue': 'mkpipe_queue'},
-            'elt.celery_app.load_data': {'queue': 'mkpipe_queue'},
+            'elt.celery_app.extract_load': {'queue': 'mkpipe_queue'},
         },
         task_default_queue='mkpipe_queue',
         task_default_exchange='mkpipe_exchange',
@@ -77,7 +76,7 @@ if run_coordinator == 'celery':
         retry_backoff_jitter=True,
         track_started=True,
     )
-    def extract_data(self_task, **kwargs):
+    def extract_load(self_task, **kwargs):
         extractor_variant = kwargs['extractor_variant']
         table_extract_conf = kwargs['table_extract_conf']
         loader_variant = kwargs['loader_variant']
@@ -88,40 +87,11 @@ if run_coordinator == 'celery':
         data = extractor.extract()
 
         if data:
-            load_data.apply_async(
-                kwargs={
-                    'loader_variant': loader_variant,
-                    'table_load_conf': table_load_conf,
-                    'data': data,
-                    'settings': settings,
-                },
-                priority=201,
-                queue='mkpipe_queue',
-                exchange='mkpipe_exchange',
-                routing_key='mkpipe',
-            )
+            loader = get_loader(loader_variant)(table_load_conf, settings)
+            elt_start_time = datetime.datetime.now()
+            loader.load(data, elt_start_time)
 
-        logger.info({'message': 'Extracted data successfully!'})
-        return True
-
-    @app.task(
-        bind=True,
-        max_retries=3,
-        retry_backoff=True,
-        retry_backoff_jitter=True,
-        track_started=True,
-    )
-    def load_data(self_task, **kwargs):
-        loader_variant = kwargs['loader_variant']
-        table_load_conf = kwargs['table_load_conf']
-        settings = kwargs['settings']
-        data = kwargs['data']
-
-        loader = get_loader(loader_variant)(table_load_conf, settings)
-        elt_start_time = datetime.datetime.now()
-        loader.load(data, elt_start_time)
-
-        logger.info({'message': 'Loaded data successfully!'})
+        logger.info({'message': 'Extract-Load is successfull!'})
         return True
 
     @app.task
@@ -162,7 +132,7 @@ class CoordinatorCelery:
         celery_task_group = []
         for task in self.task_group:
             celery_task_group.append(
-                extract_data.s(
+                extract_load.s(
                     extractor_variant=task.extractor_variant,
                     table_extract_conf=task.table_extract_conf,
                     loader_variant=task.loader_variant,

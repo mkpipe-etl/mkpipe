@@ -63,6 +63,9 @@ class BaseExtractor:
                 )
                 with open(custom_query_file_path, 'r') as f:
                     custom_query = f.read()
+                    
+            message = dict(table_name=target_name, status='extracting')
+            logger.info(message)
 
             custom_partitions_count = t.get('partitions_count', self.settings.partitions_count)
             partitions_column_ = t.get('partitions_column')
