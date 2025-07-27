@@ -49,11 +49,12 @@ class ConnectorDuckDB:
         return duckdb.connect(self.db_path)
 
     @retry_on_failure()
-    def get_table_status(self, name):
+    def get_table_status(self, pipeline_name, table_name):
         with self.connect() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                    table_name TEXT PRIMARY KEY,
+                    pipeline_name TEXT,
+                    table_name TEXT,
                     last_point TEXT,
                     type TEXT,
                     replication_method TEXT CHECK (replication_method IN ('incremental', 'full')),
@@ -64,8 +65,11 @@ class ConnectorDuckDB:
             """)
 
             result = conn.execute(
-                'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = ?',
-                (name,),
+                'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = ? and pipeline_name = ?',
+                (
+                    table_name,
+                    pipeline_name,
+                ),
             ).fetchone()
 
             if result:
@@ -73,8 +77,12 @@ class ConnectorDuckDB:
                 time_diff = datetime.now() - updated_time
                 if time_diff > timedelta(days=1):
                     conn.execute(
-                        'UPDATE mkpipe_manifest SET status = ?, updated_time = CURRENT_TIMESTAMP WHERE table_name = ?',
-                        ('failed', name),
+                        'UPDATE mkpipe_manifest SET status = ?, updated_time = CURRENT_TIMESTAMP WHERE table_name = ? and pipeline_name = ?',
+                        (
+                            'failed',
+                            table_name,
+                            pipeline_name,
+                        ),
                     )
                     return 'failed'
                 else:
@@ -83,71 +91,86 @@ class ConnectorDuckDB:
                 return None
 
     @retry_on_failure()
-    def get_last_point(self, name):
+    def get_last_point(self, pipeline_name, table_name):
         with self.connect() as conn:
             result = conn.execute(
-                'SELECT last_point FROM mkpipe_manifest WHERE table_name = ?', (name,)
+                'SELECT last_point FROM mkpipe_manifest WHERE table_name = ? and pipeline_name = ?',
+                (
+                    table_name,
+                    pipeline_name,
+                ),
             ).fetchone()
             return result[0] if result else None
 
     @retry_on_failure()
     def manifest_table_update(
         self,
-        name,
+        pipeline_name,
+        table_name,
         value,
         value_type,
         status='completed',
         replication_method='full',
         error_message=None,
     ):
+        """Updates or inserts a record into the manifest table."""
         with self.connect() as conn:
+            # Check if the record already exists
             exists = conn.execute(
-                'SELECT 1 FROM mkpipe_manifest WHERE table_name = ?', (name,)
+                'SELECT 1 FROM mkpipe_manifest WHERE table_name = ? and pipeline_name = ?',
+                (table_name, pipeline_name),
             ).fetchone()
 
             if exists:
+                # --- UPDATE existing record ---
                 update_fields = []
                 update_values = []
 
+                # Conditionally build the SET clause for optional fields
                 if value is not None:
                     update_fields.append('last_point = ?')
                     update_values.append(value)
 
                 if value_type is not None:
-                    update_fields.append('type = ?')
+                    # "type" is a reserved SQL keyword, so it should be quoted
+                    update_fields.append('"type" = ?')
                     update_values.append(value_type)
 
-                update_fields.append('status = ?')
-                update_values.append(status)
+                # Always update these fields
+                update_fields.extend(
+                    [
+                        'status = ?',
+                        'replication_method = ?',
+                        'error_message = ?',  # Update to clear old errors
+                        'updated_time = CURRENT_TIMESTAMP',
+                    ]
+                )
+                update_values.extend(
+                    [status, replication_method, error_message, table_name, pipeline_name]
+                )
 
-                update_fields.append('replication_method = ?')
-                update_values.append(replication_method)
-
-                if error_message is not None:
-                    update_fields.append('error_message = ?')
-                    update_values.append(error_message)
-
-                update_fields.append('updated_time = CURRENT_TIMESTAMP')
-
-                update_values.append(name)
-
-                conn.execute(
-                    f"""
+                # Construct and execute the final UPDATE query
+                update_query = f"""
                     UPDATE mkpipe_manifest
                     SET {', '.join(update_fields)}
-                    WHERE table_name = ?
-                """,
-                    update_values,
-                )
+                    WHERE table_name = ? and pipeline_name = ?
+                """
+                conn.execute(update_query, update_values)
+
             else:
+                # --- INSERT new record ---
+                # "type" is quoted, and the placeholder count matches the parameter count
                 conn.execute(
                     """
                     INSERT INTO mkpipe_manifest (
-                        table_name, last_point, type, status, replication_method, error_message, updated_time
-                    ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """,
+                        pipeline_name, table_name, last_point, "type", status,
+                        replication_method, error_message, updated_time
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """,
                     (
-                        name,
+                        pipeline_name,
+                        table_name,
                         value,
                         value_type,
                         status,

@@ -22,7 +22,7 @@ class PipeSettings(BaseModel):
     compression_codec: str = 'zstd'  # Options: snappy, gzip, zstd, lz4, none
     spark_driver_memory: str = driver_mem
     spark_executor_memory: str = executor_mem
-    partitions_count: int = 1
+    partitions_count: int = 10
     ROOT_DIR: str
     driver_name: Optional[str] = None
 

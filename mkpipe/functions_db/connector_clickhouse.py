@@ -47,10 +47,11 @@ class ConnectorClickhouse:
         )
 
     @retry_on_failure()
-    def get_table_status(self, name):
+    def get_table_status(self, pipeline_name, table_name):
         client = self.connect()
         client.command("""
             CREATE TABLE IF NOT EXISTS mkpipe_manifest (
+                pipeline_name String,
                 table_name String,
                 last_point Nullable(String),
                 type Nullable(String),
@@ -59,11 +60,11 @@ class ConnectorClickhouse:
                 error_message Nullable(String),
                 updated_time DateTime DEFAULT now()
             ) ENGINE = MergeTree()
-            ORDER BY table_name;
+            ORDER BY (pipelinename,table_name);
         """)
 
         query_result = client.query(
-            f"SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = '{name}'"
+            f"SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = '{table_name}' and pipeline_name = '{pipeline_name}' "
         )
 
         result = query_result.first_row if query_result.row_count != 0 else None
@@ -74,7 +75,7 @@ class ConnectorClickhouse:
                 client.command(
                     f"""
                     ALTER TABLE mkpipe_manifest UPDATE status = 'failed', updated_time = now()
-                    WHERE table_name = '{name}'
+                    WHERE table_name = '{table_name}' and pipeline_name = '{pipeline_name}'
                 """
                 )
                 return 'failed'
@@ -84,10 +85,10 @@ class ConnectorClickhouse:
             return None
 
     @retry_on_failure()
-    def get_last_point(self, name):
+    def get_last_point(self, pipeline_name, table_name):
         client = self.connect()
         query_result = client.query(
-            f"SELECT last_point FROM mkpipe_manifest WHERE table_name = '{name}'"
+            f"SELECT last_point FROM mkpipe_manifest WHERE table_name = '{table_name}' and pipeline_name = '{pipeline_name}' "
         )
 
         result = query_result.first_row if query_result.row_count != 0 else None
@@ -96,7 +97,8 @@ class ConnectorClickhouse:
     @retry_on_failure()
     def manifest_table_update(
         self,
-        name,
+        pipeline_name,
+        table_name,
         value,
         value_type,
         status='completed',
@@ -106,7 +108,7 @@ class ConnectorClickhouse:
         client = self.connect()
 
         query_result = client.query(
-            f"SELECT table_name FROM mkpipe_manifest WHERE table_name = '{name}'"
+            f"SELECT table_name FROM mkpipe_manifest WHERE table_name = '{table_name}' and pipeline_name = '{pipeline_name}' "
         )
 
         result = query_result.first_row if query_result.row_count != 0 else None
@@ -127,17 +129,18 @@ class ConnectorClickhouse:
             update_parts.append('updated_time = now()')
 
             update_sql = f"""
-                ALTER TABLE mkpipe_manifest UPDATE {', '.join(update_parts)} WHERE table_name = '{name}'
+                ALTER TABLE mkpipe_manifest UPDATE {', '.join(update_parts)} WHERE table_name = '{table_name}' and pipeline_name = '{pipeline_name}'
             """
             client.command(update_sql)
         else:
             client.command(
                 f"""
                 INSERT INTO mkpipe_manifest (
-                    table_name, last_point, type, status,
+                    pipeline_name, table_name, last_point, type, status,
                     replication_method, error_message, updated_time
                 ) VALUES (
-                    {format_clickhouse_value(name)},
+                    {format_clickhouse_value(pipeline_name)},
+                    {format_clickhouse_value(table_name)},
                     {format_clickhouse_value(value)},
                     {format_clickhouse_value(value_type)},
                     {format_clickhouse_value(status)},

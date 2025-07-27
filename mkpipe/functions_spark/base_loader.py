@@ -15,6 +15,7 @@ class BaseLoader:
             self.settings = PipeSettings(**settings)
         else:
             self.settings = settings
+        self.pipeline_name = config.get('pipeline_name', None)
         self.connection_params = config['connection_params']
         self.table = config['table']
         self.pass_on_error = config.get('pass_on_error', None)
@@ -85,7 +86,8 @@ class BaseLoader:
             df = data['df']
 
             self.backend.manifest_table_update(
-                name=name,
+                pipeline_name=self.pipeline_name,
+                table_name=name,
                 value=None,
                 value_type=None,
                 status='loading',
@@ -95,7 +97,8 @@ class BaseLoader:
 
             if not df:
                 self.backend.manifest_table_update(
-                    name=name,
+                    pipeline_name=self.pipeline_name,
+                    table_name=name,
                     value=last_point_value,
                     value_type=iterate_column_type,
                     status='completed',
@@ -115,7 +118,8 @@ class BaseLoader:
             self.write_df(df=df, write_mode=write_mode, table_name=name, batchsize=batchsize)
 
             self.backend.manifest_table_update(
-                name=name,
+                pipeline_name=self.pipeline_name,
+                table_name=name,
                 value=last_point_value,
                 value_type=iterate_column_type,
                 status='completed',
@@ -140,7 +144,8 @@ class BaseLoader:
             )
 
             self.backend.manifest_table_update(
-                name=name,
+                pipeline_name=self.pipeline_name,
+                table_name=name,
                 value=None,  # Last point remains unchanged
                 value_type=None,  # Type remains unchanged
                 status='failed',

@@ -6,10 +6,6 @@ prod:
   settings:
     run_coordinator: single
     timezone: 'UTC'
-    partitions_count: 2
-    spark_driver_memory: '4g'
-    spark_executor_memory: '3g'
-    
     backend:
       variant: sqlite
 

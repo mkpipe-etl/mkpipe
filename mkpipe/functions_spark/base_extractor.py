@@ -14,6 +14,7 @@ class BaseExtractor:
             self.settings = PipeSettings(**settings)
         else:
             self.settings = settings
+        self.pipeline_name = config.get('pipeline_name', None)
         self.connection_params = config['connection_params']
         self.table = config['table']
         self.pass_on_error = config.get('pass_on_error', None)
@@ -74,7 +75,7 @@ class BaseExtractor:
             partitions_column = self.normalize_partitions_column(partitions_column_)
             p_col_name = partitions_column_.split(' as ')[-1].strip()
 
-            last_point = self.backend.get_last_point(target_name)
+            last_point = self.backend.get_last_point(self.pipeline_name, target_name)
             iterate_query = f"""
                 select 
                     min({partitions_column}) as min_val, 
@@ -279,7 +280,10 @@ class BaseExtractor:
         try:
             target_name = t['target_name']
             replication_method = t.get('replication_method', None)
-            if self.backend.get_table_status(target_name) in ['extracting', 'loading']:
+            if self.backend.get_table_status(self.pipeline_name, target_name) in [
+                'extracting',
+                'loading',
+            ]:
                 logger.info({'message': f'Skipping {target_name}, already in progress...'})
                 data = {
                     'status': 'completed',
@@ -288,7 +292,8 @@ class BaseExtractor:
                 return data
 
             self.backend.manifest_table_update(
-                name=target_name,
+                pipeline_name=self.pipeline_name,
+                table_name=target_name,
                 value=None,  # Last point remains unchanged
                 value_type=None,  # Type remains unchanged
                 status='extracting',  # ('completed', 'failed', 'extracting', 'loading')
@@ -309,9 +314,10 @@ class BaseExtractor:
                 etl_start_time=str(extract_start_time),
             )
             self.backend.manifest_table_update(
-                target_name,
-                None,
-                None,
+                pipeline_name=self.pipeline_name,
+                table_name=target_name,
+                value=None,
+                value_type=None,
                 status='failed',
                 replication_method=replication_method,
                 error_message=str(e),

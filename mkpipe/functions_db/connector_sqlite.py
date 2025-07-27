@@ -8,6 +8,7 @@ from ..config import ROOT_DIR
 
 
 def retry_on_failure(max_attempts=5, delay=1):
+    logger = Logger(__file__)
     """
     Decorator to retry a database operation upon failure.
 
@@ -20,8 +21,6 @@ def retry_on_failure(max_attempts=5, delay=1):
     """
 
     def decorator(func):
-        logger = Logger(__file__)
-
         @wraps(func)
         def wrapper(*args, **kwargs):
             attempts = 0
@@ -62,7 +61,7 @@ class ConnectorSQLite:
         )
 
     @retry_on_failure()
-    def get_table_status(self, name):
+    def get_table_status(self, pipeline_name, table_name):
         """
         Check the status of a table from the mkpipe_manifest. If the updated_time is older than 1 day,
         update the status to 'failed' and return 'failed'. Otherwise, return the current status.
@@ -74,7 +73,8 @@ class ConnectorSQLite:
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                        table_name TEXT PRIMARY KEY,
+                        pipeline_name TEXT,
+                        table_name TEXT,
                         last_point TEXT,
                         type TEXT,
                         replication_method TEXT CHECK (replication_method IN ('incremental', 'full')),
@@ -85,20 +85,25 @@ class ConnectorSQLite:
                     """
                 )
 
-                cursor = conn.execute(
-                    'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = ?',
-                    (name,),
-                )
-                result = cursor.fetchone()
+                result = conn.execute(
+                    'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = ? and pipeline_name = ?',
+                    (
+                        table_name,
+                        pipeline_name,
+                    ),
+                ).fetchone()
 
                 if result:
                     current_status, updated_time = result
                     time_diff = datetime.now() - updated_time
-
                     if time_diff > timedelta(days=1):
                         conn.execute(
-                            'UPDATE mkpipe_manifest SET status = ?, updated_time = CURRENT_TIMESTAMP WHERE table_name = ?',
-                            ('failed', name),
+                            'UPDATE mkpipe_manifest SET status = ?, updated_time = CURRENT_TIMESTAMP WHERE table_name = ? and pipeline_name = ?',
+                            (
+                                'failed',
+                                table_name,
+                                pipeline_name,
+                            ),
                         )
                         return 'failed'
                     else:
@@ -107,24 +112,27 @@ class ConnectorSQLite:
                     return None
 
     @retry_on_failure()
-    def get_last_point(self, name):
+    def get_last_point(self, pipeline_name, table_name):
         """
         Retrieve the last_point value for the given table.
         """
         with self.connect() as conn:
             conn.row_factory = sqlite3.Row
             with conn:
-                cursor = conn.execute(
-                    'SELECT last_point FROM mkpipe_manifest WHERE table_name = ?',
-                    (name,),
-                )
-                result = cursor.fetchone()
-                return result['last_point'] if result else None
+                result = conn.execute(
+                    'SELECT last_point FROM mkpipe_manifest WHERE table_name = ? and pipeline_name = ?',
+                    (
+                        table_name,
+                        pipeline_name,
+                    ),
+                ).fetchone()
+                return result[0] if result else None
 
     @retry_on_failure()
     def manifest_table_update(
         self,
-        name,
+        pipeline_name,
+        table_name,
         value,
         value_type,
         status='completed',
@@ -137,11 +145,11 @@ class ConnectorSQLite:
         with self.connect() as conn:
             conn.row_factory = sqlite3.Row
             with conn:
-                cursor = conn.execute(
-                    'SELECT table_name FROM mkpipe_manifest WHERE table_name = ?',
-                    (name,),
-                )
-                if cursor.fetchone():
+                exists = conn.execute(
+                    'SELECT 1 FROM mkpipe_manifest WHERE table_name = ? and pipeline_name = ?',
+                    (table_name, pipeline_name),
+                ).fetchone()
+                if exists:
                     # Prepare update fields
                     update_fields = []
                     update_values = []
@@ -155,36 +163,39 @@ class ConnectorSQLite:
                         update_values.append(value_type)
 
                     # Always update status, replication_method, and error_message
-                    update_fields.append('status = ?')
-                    update_values.append(status)
 
-                    update_fields.append('replication_method = ?')
-                    update_values.append(replication_method)
-
-                    if error_message is not None:
-                        update_fields.append('error_message = ?')
-                        update_values.append(error_message)
-
-                    update_fields.append('updated_time = CURRENT_TIMESTAMP')
-
-                    update_values.append(name)  # For the WHERE clause
+                    update_fields.extend(
+                        [
+                            'status = ?',
+                            'replication_method = ?',
+                            'error_message = ?',  # Update to clear old errors
+                            'updated_time = CURRENT_TIMESTAMP',
+                        ]
+                    )
+                    update_values.extend(
+                        [status, replication_method, error_message, table_name, pipeline_name]
+                    )
 
                     # Construct and execute the update query
-                    update_sql = f"""
+                    update_query = f"""
                         UPDATE mkpipe_manifest
                         SET {', '.join(update_fields)}
-                        WHERE table_name = ?
+                        WHERE table_name = ? and pipeline_name = ?
                     """
-                    conn.execute(update_sql, tuple(update_values))
+                    conn.execute(update_query, tuple(update_values))
                 else:
                     # Insert new entry
                     conn.execute(
                         """
-                        INSERT INTO mkpipe_manifest (table_name, last_point, type, status, replication_method, error_message, updated_time)
-                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        INSERT INTO mkpipe_manifest (
+                            pipeline_name, table_name, last_point, type, status, 
+                            replication_method, error_message, updated_time
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                         """,
                         (
-                            name,
+                            pipeline_name,
+                            table_name,
                             value,
                             value_type,
                             status,

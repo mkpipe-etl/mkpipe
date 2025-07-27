@@ -63,6 +63,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
             connection_params = DATA['connections'][loader_conf['connection_ref']]
             loader_variant = connection_params['variant']
             loader_conf['connection_params'] = connection_params
+            loader_conf['pipeline_name'] = pipeline_name
 
         except KeyError as e:
             logger.info(
@@ -79,6 +80,7 @@ def main(config_file_name: str = None, pipeline_name_set=None, table_name_set=No
             connection_params = DATA['connections'][extractor_conf['connection_ref']]
             extractor_variant = connection_params['variant']
             extractor_conf['connection_params'] = connection_params
+            extractor_conf['pipeline_name'] = pipeline_name
         except KeyError as e:
             logger.info(
                 {

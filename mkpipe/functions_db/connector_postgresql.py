@@ -58,7 +58,7 @@ class ConnectorPostgresql:
         )
 
     @retry_on_failure()
-    def get_table_status(self, name):
+    def get_table_status(self, pipeline_name, table_name):
         """
         Check the status of a table from the mkpipe_manifest. If the updated_time is older than 1 day,
         update the status to 'failed' and return 'failed'. Otherwise, return the current status.
@@ -69,7 +69,8 @@ class ConnectorPostgresql:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                        table_name VARCHAR(255) PRIMARY KEY,
+                        pipeline_name VARCHAR(255),
+                        table_name VARCHAR(255),
                         last_point VARCHAR(50),
                         type VARCHAR(50),
                         replication_method VARCHAR(20) CHECK (replication_method IN ('incremental', 'full')),
@@ -82,8 +83,11 @@ class ConnectorPostgresql:
 
                 # Check table status
                 cursor.execute(
-                    'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = %s',
-                    (name,),
+                    'SELECT status, updated_time FROM mkpipe_manifest WHERE table_name = %s and pipeline_name = %s',
+                    (
+                        table_name,
+                        pipeline_name,
+                    ),
                 )
                 result = cursor.fetchone()
 
@@ -93,8 +97,8 @@ class ConnectorPostgresql:
 
                     if time_diff > timedelta(days=1):
                         cursor.execute(
-                            'UPDATE mkpipe_manifest SET status = %s, updated_time = CURRENT_TIMESTAMP WHERE table_name = %s',
-                            ('failed', name),
+                            'UPDATE mkpipe_manifest SET status = %s, updated_time = CURRENT_TIMESTAMP WHERE table_name = %s and pipeline_name = %s',
+                            ('failed', table_name, pipeline_name),
                         )
                         conn.commit()
                         return 'failed'
@@ -104,15 +108,18 @@ class ConnectorPostgresql:
                     return None
 
     @retry_on_failure()
-    def get_last_point(self, name):
+    def get_last_point(self, pipeline_name, table_name):
         """
         Retrieve the last_point value for the given table.
         """
         with self.connect() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    'SELECT last_point FROM mkpipe_manifest WHERE table_name = %s',
-                    (name,),
+                    'SELECT last_point FROM mkpipe_manifest WHERE table_name = %s and pipeline_name= %s',
+                    (
+                        table_name,
+                        pipeline_name,
+                    ),
                 )
                 result = cursor.fetchone()
                 return result[0] if result else None
@@ -120,7 +127,8 @@ class ConnectorPostgresql:
     @retry_on_failure()
     def manifest_table_update(
         self,
-        name,
+        pipeline_name,
+        table_name,
         value,
         value_type,
         status='completed',
@@ -133,8 +141,11 @@ class ConnectorPostgresql:
         with self.connect() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    'SELECT table_name FROM mkpipe_manifest WHERE table_name = %s',
-                    (name,),
+                    'SELECT table_name FROM mkpipe_manifest WHERE table_name = %s and pipeline_name = %s',
+                    (
+                        table_name,
+                        pipeline_name,
+                    ),
                 )
                 if cursor.fetchone():
                     # Prepare update fields
@@ -149,37 +160,36 @@ class ConnectorPostgresql:
                         update_fields.append('type = %s')
                         update_values.append(value_type)
 
-                    # Always update status, replication_method, and error_message
-                    update_fields.append('status = %s')
-                    update_values.append(status)
-
-                    update_fields.append('replication_method = %s')
-                    update_values.append(replication_method)
-
-                    if error_message is not None:
-                        update_fields.append('error_message = %s')
-                        update_values.append(error_message)
-
-                    update_fields.append('updated_time = CURRENT_TIMESTAMP')
-
-                    update_values.append(name)  # For the WHERE clause
+                    # Always update these fields
+                    update_fields.extend(
+                        [
+                            'status = %s',
+                            'replication_method = %s',
+                            'error_message = %s',  # Update to clear old errors
+                            'updated_time = CURRENT_TIMESTAMP',
+                        ]
+                    )
+                    update_values.extend(
+                        [status, replication_method, error_message, table_name, pipeline_name]
+                    )
 
                     # Construct and execute the update query
                     update_sql = f"""
                         UPDATE mkpipe_manifest
                         SET {', '.join(update_fields)}
-                        WHERE table_name = %s
+                        WHERE table_name = %s and pipeline_name = %s
                     """
                     cursor.execute(update_sql, tuple(update_values))
                 else:
                     # Insert new entry
                     cursor.execute(
                         """
-                        INSERT INTO mkpipe_manifest (table_name, last_point, type, status, replication_method, error_message, updated_time)
-                        VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        INSERT INTO mkpipe_manifest (pipeline_name, table_name, last_point, type, status, replication_method, error_message, updated_time)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                         """,
                         (
-                            name,
+                            pipeline_name,
+                            table_name,
                             value,
                             value_type,
                             status,
