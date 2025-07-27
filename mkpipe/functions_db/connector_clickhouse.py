@@ -60,7 +60,7 @@ class ConnectorClickhouse:
                 error_message Nullable(String),
                 updated_time DateTime DEFAULT now()
             ) ENGINE = MergeTree()
-            ORDER BY (pipe_linename, table_name);
+            ORDER BY (pipeline_name, table_name);
         """)
 
         query_result = client.query(
