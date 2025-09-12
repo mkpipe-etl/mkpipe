@@ -50,9 +50,9 @@ def create_spark_session(settings):
     # Build the SparkSession
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
-    logger = spark._jvm.org.apache.log4j
-    logger.LogManager.getLogger('org.apache.spark.sql.execution.datasources.jdbc').setLevel(
-        logger.Level.DEBUG
-    )
+    # logger = spark._jvm.org.apache.log4j
+    # logger.LogManager.getLogger('org.apache.spark.sql.execution.datasources.jdbc').setLevel(
+    #     logger.Level.DEBUG
+    # )
 
     return spark

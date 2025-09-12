@@ -77,24 +77,27 @@ class BaseExtractor:
 
             last_point = self.backend.get_last_point(self.pipeline_name, target_name)
             iterate_query = f"""
+                (
                 select 
                     min({partitions_column}) as min_val, 
                     max({partitions_column}) as max_val, 
                     count(*) as record_count
-                from {name} 
             """
             if last_point:
                 iterate_query = (
-                    iterate_query + f""" {name} where {partitions_column} > '{last_point}' """
+                    iterate_query + f""" {name} where {partitions_column} > '{last_point}' ) q """
                 )
                 write_mode = 'append'
             else:
+                iterate_query = (
+                    iterate_query + f""" {name} ) q """
+                )
                 write_mode = 'overwrite'
 
             df_iterate_list = (
                 spark.read.format('jdbc')
                 .option('url', self.jdbc_url)
-                .option('query', iterate_query)
+                .option('dbtable', iterate_query)
                 .option('driver', self.driver_jdbc)
                 .load()
             )
@@ -163,12 +166,9 @@ class BaseExtractor:
         try:
             name = t['name']
             target_name = t['target_name']
-            iterate_column_type = t.get('iterate_column_type', None)
             message = dict(table_name=target_name, status='extracting')
             logger.info(message)
-            custom_partitions_count = t.get('partitions_count', self.settings.partitions_count)
             fetchsize = t.get('fetchsize', 100_000)
-            partitions_column_ = t.get('partitions_column', None)
 
             custom_query = t.get('custom_query', None)
             custom_query_file = t.get('custom_query_file', None)
@@ -189,70 +189,14 @@ class BaseExtractor:
                     ' where 1=1 ',
                 )
 
-            if partitions_column_:
-                partitions_column = partitions_column_.split(' as ')[0]
-                p_col_name = partitions_column_.split(' as ')[-1]
-
-                iterate_query = f"""
-                    select 
-                        min({partitions_column}) as min_val, 
-                        max({partitions_column}) as max_val, 
-                        count(*) as record_count
-                    from {name} 
-                """
-
-                df_iterate_list = (
-                    spark.read.format('jdbc')
-                    .option('url', self.jdbc_url)
-                    .option('query', iterate_query)
-                    .option('driver', self.driver_jdbc)
-                    .load()
-                )
-
-                row = df_iterate_list.first()
-                min_val, max_val, record_count = row[0], row[1], row[2]
-
-                if iterate_column_type == 'int':
-                    min_filter = int(min_val)
-                    max_filter = int(max_val)
-                elif iterate_column_type == 'datetime':
-                    min_filter = min_val.strftime('%Y-%m-%d %H:%M:%S.%f')
-                    max_filter = max_val.strftime('%Y-%m-%d %H:%M:%S.%f')
-
-                if not row or record_count == 0:
-                    # empty df, we need schema
-                    df = (
-                        spark.read.format('jdbc')
-                        .option('url', self.jdbc_url)
-                        .option('dbtable', updated_query)
-                        .option('driver', self.driver_jdbc)
-                        .option('fetchsize', fetchsize)
-                        .load()
-                    )
-                else:
-                    # which means table not empt
-                    df = (
-                        spark.read.format('jdbc')
-                        .option('url', self.jdbc_url)
-                        .option('dbtable', updated_query)
-                        .option('driver', self.driver_jdbc)
-                        .option('numPartitions', custom_partitions_count)
-                        .option('partitionColumn', p_col_name)
-                        .option('lowerBound', min_filter)
-                        .option('upperBound', max_filter)
-                        .option('fetchsize', fetchsize)
-                        .load()
-                    )
-
-            else:
-                df = (
-                    spark.read.format('jdbc')
-                    .option('url', self.jdbc_url)
-                    .option('dbtable', updated_query)
-                    .option('driver', self.driver_jdbc)
-                    .option('fetchsize', fetchsize)
-                    .load()
-                )
+            df = (
+                spark.read.format('jdbc')
+                .option('url', self.jdbc_url)
+                .option('dbtable', updated_query)
+                .option('driver', self.driver_jdbc)
+                .option('fetchsize', fetchsize)
+                .load()
+            )
 
             data = {
                 'write_mode': write_mode,
