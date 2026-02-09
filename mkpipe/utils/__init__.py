@@ -1,5 +1,3 @@
-from .logger import Logger
-from .logger import log_container
-from .base_class import InputTask, PipeSettings
+from .logger import Logger, get_logger
 
-__all__ = (Logger, log_container, InputTask, PipeSettings)
+__all__ = ('Logger', 'get_logger')

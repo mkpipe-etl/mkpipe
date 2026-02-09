@@ -1,57 +1,94 @@
 import os
+import re
 from pathlib import Path
+from typing import Any, Dict, Union
+
 import yaml
 from dotenv import load_dotenv
 
+from .models import (
+    BackendConfig,
+    ConnectionConfig,
+    MkpipeConfig,
+    PipelineConfig,
+    SettingsConfig,
+    SparkConfig,
+    TableConfig,
+)
+
 load_dotenv()
 
-TIMEZONE = os.getenv('MKPIPE_PROJECT_TIMEZONE', 'UTC')
-ROOT_DIR = Path(os.getenv('MKPIPE_PROJECT_DIR', '/app'))
-ROOT_DIR.mkdir(parents=True, exist_ok=True)
-CONFIG_FILE = str(ROOT_DIR / 'mkpipe_project.yaml')
+_ENV_VAR_PATTERN = re.compile(r'\$\{([^}]+)\}')
 
 
-def update_globals(config):
-    """Update global variables based on the provided config dictionary."""
-    global_vars = globals()
-    for key, value in config.items():
-        if key in global_vars:  # Update only if the key exists in the globals
-            global_vars[key] = value
+def _resolve_env_vars(value: Any) -> Any:
+    if isinstance(value, str):
+        def _replacer(match):
+            var_name = match.group(1)
+            env_val = os.environ.get(var_name)
+            if env_val is None:
+                raise ValueError(
+                    f"Environment variable '{var_name}' is not set "
+                    f"(referenced as '${{{var_name}}}')"
+                )
+            return env_val
 
-
-def load_config(config_file=None):
-    global CONFIG_FILE
-    if config_file:
-        CONFIG_FILE = config_file
-    config_path = Path(CONFIG_FILE).resolve()
-    if not config_path.exists():
-        raise FileNotFoundError(f'Configuration file not found: {config_path}')
-
-    with config_path.open('r') as f:
-        data = yaml.safe_load(f)
-        ENV = data.get('default_environment', 'prod')  # Default to 'prod' if not specified
-        env_config = data.get(ENV, {})
-
-    return env_config
-
-
-def get_config_value(keys, file_name):
-    """
-    Retrieve a specific configuration value using a list of keys.
-
-    Args:
-        keys (list): List of keys to retrieve the value (e.g., ['paths', 'bucket_name']).
-        file_name (str, optional): Path to the configuration file. Defaults to None.
-
-    Returns:
-        The value corresponding to the keys or None if the path is invalid.
-    """
-    config = load_config(file_name)
-
-    value = config
-    for key in keys:
-        if isinstance(value, dict) and key in value:
-            value = value[key]
-        else:
-            return None
+        return _ENV_VAR_PATTERN.sub(_replacer, value)
+    elif isinstance(value, dict):
+        return {k: _resolve_env_vars(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_resolve_env_vars(item) for item in value]
     return value
+
+
+def load_config(path: Union[str, Path]) -> MkpipeConfig:
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+
+    with path.open('r') as f:
+        raw = yaml.safe_load(f) or {}
+
+    environment = raw.get('default_environment', 'prod')
+    env_data = raw.get(environment)
+    if env_data is None:
+        raise ValueError(
+            f"Environment '{environment}' not found in config file. "
+            f"Available: {[k for k in raw.keys() if k != 'default_environment']}"
+        )
+
+    env_data = _resolve_env_vars(env_data)
+    version = raw.get('version', 2)
+
+    settings_raw = env_data.get('settings', {})
+    settings = SettingsConfig(
+        timezone=settings_raw.get('timezone', 'UTC'),
+        backend=BackendConfig(**settings_raw.get('backend', {})),
+        spark=SparkConfig(**settings_raw.get('spark', {})),
+    )
+
+    connections: Dict[str, ConnectionConfig] = {}
+    for name, conn_raw in env_data.get('connections', {}).items():
+        connections[name] = ConnectionConfig(**conn_raw)
+
+    pipelines = []
+    for pipe_raw in env_data.get('pipelines', []):
+        tables = []
+        for tbl_raw in pipe_raw.get('tables', []):
+            tables.append(TableConfig(**tbl_raw))
+        pipelines.append(
+            PipelineConfig(
+                name=pipe_raw['name'],
+                source=pipe_raw['source'],
+                destination=pipe_raw['destination'],
+                tables=tables,
+                pass_on_error=pipe_raw.get('pass_on_error', False),
+            )
+        )
+
+    return MkpipeConfig(
+        version=version,
+        settings=settings,
+        connections=connections,
+        pipelines=pipelines,
+    )

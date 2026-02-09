@@ -1,3 +1,0 @@
-mkpipe>=0.2.9
-mkpipe-loader-mariadb>=0.2.2
-mkpipe-extractor-postgres>=0.2.4

@@ -62,7 +62,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-mkpipe_project.yaml
+# mkpipe_project.yaml
 
 # Spyder project settings
 .spyderproject

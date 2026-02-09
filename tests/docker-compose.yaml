@@ -1,12 +1,110 @@
 services:
-  db:
-    image: mariadb:11-ubi
-    # image: mysql:8.4.3
-    container_name: db
+  # --- PostgreSQL (source + target) ---
+  postgres_source:
+    image: postgres:16
+    container_name: mkpipe_pg_source
     environment:
-      MYSQL_DATABASE: "db"
-      MYSQL_USER: "user"
-      MYSQL_PASSWORD: "password"
-      MYSQL_ROOT_PASSWORD: "password"
+      POSTGRES_DB: source_db
+      POSTGRES_USER: mkpipe
+      POSTGRES_PASSWORD: mkpipe123
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init/postgres_source.sql:/docker-entrypoint-initdb.d/init.sql
+
+  postgres_target:
+    image: postgres:16
+    container_name: mkpipe_pg_target
+    environment:
+      POSTGRES_DB: target_db
+      POSTGRES_USER: mkpipe
+      POSTGRES_PASSWORD: mkpipe123
+    ports:
+      - "5433:5432"
+
+  # --- MySQL ---
+  mysql:
+    image: mysql:8.4
+    container_name: mkpipe_mysql
+    environment:
+      MYSQL_DATABASE: source_db
+      MYSQL_USER: mkpipe
+      MYSQL_PASSWORD: mkpipe123
+      MYSQL_ROOT_PASSWORD: mkpipe123
     ports:
       - "3306:3306"
+    volumes:
+      - ./init/mysql.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # --- MariaDB ---
+  mariadb:
+    image: mariadb:11
+    container_name: mkpipe_mariadb
+    environment:
+      MYSQL_DATABASE: source_db
+      MYSQL_USER: mkpipe
+      MYSQL_PASSWORD: mkpipe123
+      MYSQL_ROOT_PASSWORD: mkpipe123
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./init/mysql.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # --- ClickHouse ---
+  clickhouse:
+    image: clickhouse/clickhouse-server:24
+    container_name: mkpipe_clickhouse
+    environment:
+      CLICKHOUSE_DB: source_db
+      CLICKHOUSE_USER: mkpipe
+      CLICKHOUSE_PASSWORD: mkpipe123
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./init/clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # --- MongoDB ---
+  mongodb:
+    image: mongo:7
+    container_name: mkpipe_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mkpipe
+      MONGO_INITDB_ROOT_PASSWORD: mkpipe123
+      MONGO_INITDB_DATABASE: source_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./init/mongodb.js:/docker-entrypoint-initdb.d/init.js
+
+  # --- Redis ---
+  redis:
+    image: redis:7
+    container_name: mkpipe_redis
+    command: redis-server --requirepass mkpipe123
+    ports:
+      - "6379:6379"
+
+  # --- Elasticsearch ---
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: mkpipe_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+
+  # --- TimescaleDB ---
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: mkpipe_timescaledb
+    environment:
+      POSTGRES_DB: source_db
+      POSTGRES_USER: mkpipe
+      POSTGRES_PASSWORD: mkpipe123
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./init/timescaledb.sql:/docker-entrypoint-initdb.d/init.sql

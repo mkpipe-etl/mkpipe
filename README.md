@@ -1,199 +1,186 @@
+# mkpipe
 
-# MkPipe
+**mkpipe** is a Spark-based, modular ETL framework. It provides a Python-first API for building data pipelines with pluggable extractors, loaders, and inline transformations.
 
-**MkPipe** is a modular, open-source ETL (Extract, Transform, Load) tool that allows you to integrate various data sources and sinks easily. It is designed to be extensible with a plugin-based architecture that supports extractors, transformers, and loaders.
+## Key Features
 
-## Features
+- **PySpark engine** — parallel, partitioned JDBC reads/writes for high-throughput data movement
+- **Modular plugins** — `pip install mkpipe-extractor-postgres` to add a source, `pip install mkpipe-loader-postgres` to add a destination
+- **Single YAML config** — define connections, pipelines, and tables in one file
+- **Orchestrator-agnostic** — use with Dagster, Airflow, cron, or any Python scheduler
+- **Inline transformations** — reference a Python function (`df → df`) directly in YAML
+- **Dependency Injection** — pass your own SparkSession (Glue, EMR, Dataproc) or let mkpipe create one
+- **Incremental & full replication** — built-in support for both strategies with automatic state tracking
 
-- Extract data from multiple sources (e.g., PostgreSQL, MongoDB).
-- Transform data using custom Python logic and Apache Spark.
-- Load data into various sinks (e.g., ClickHouse, PostgreSQL, Parquet).
-- Plugin-based architecture that supports future extensions.
-- Cloud-native architecture, can be deployed on Kubernetes and other environments.
+## Quick Start
 
-## Quick Setup
+```bash
+pip install mkpipe mkpipe-extractor-postgres mkpipe-loader-postgres
+```
 
-You can deploy MkPipe using one of the following strategies:
+Create `mkpipe_project.yaml`:
 
-### 1. Using Docker Compose
+```yaml
+version: 2
+default_environment: prod
 
-This method sets up all required services automatically using Docker Compose.
+prod:
+  settings:
+    timezone: UTC
+    backend:
+      variant: sqlite
 
-#### Steps:
+  connections:
+    source_pg:
+      variant: postgresql
+      host: localhost
+      port: 5432
+      database: source_db
+      user: ${PG_USER}
+      password: ${PG_PASSWORD}
+      schema: public
 
-1. Clone or copy the [`deploy`](./deploy/single) folder from the repository.
-2. Modify the configuration files:
-   - [`.env`](./deploy/celery/.env.example) for environment variables.
-   - [`mkpipe_project.yaml`](./deploy/celery/mkpipe_project.yaml.example) for your specific ETL configurations.
-3. Run the following command to start the services:
-   ```bash
-   docker-compose up --build
-   ```
-   This will set up the following services:
-   - PostgreSQL: Required for data storage.
-   - RabbitMQ: Required for the Celery [`run_coordinator=celery`](./deploy/celery/mkpipe_project.yaml.example#L7).
-   - Celery Worker: Required for running the Celery [`run_coordinator=celery`](./deploy/celery/mkpipe_project.yaml.example#L7).
-   - Flower UI: Optional, but required for monitoring Celery tasks.
+    target_pg:
+      variant: postgresql
+      host: localhost
+      port: 5432
+      database: dwh_db
+      user: ${PG_USER}
+      password: ${PG_PASSWORD}
+      schema: staging
 
-   **Note:** If you only want to use the [`run_coordinator=single`](./deploy/single/mkpipe_project.yaml.example#L7)without Celery, only PostgreSQL is necessary.
+  pipelines:
+    - name: my_pipeline
+      source: source_pg
+      destination: target_pg
+      tables:
+        - name: public.users
+          target_name: stg_users
+          replication_method: incremental
+          iterate_column: updated_at
+          iterate_column_type: datetime
 
-### 2. Running Locally
+        - name: public.orders
+          target_name: stg_orders
+          replication_method: full
+```
 
-You can also set up the environment manually and run MkPipe locally.
+Run it:
 
-#### Steps:
+```bash
+mkpipe run --config mkpipe_project.yaml
+```
 
-1. Set up and configure the following services:
-   - RabbitMQ: Required for the Celery `run_coordinator`.
-   - PostgreSQL: Required for data storage.
-   - Flower UI: Optional, but required for monitoring Celery tasks.
-2. Update the following configuration files in the `deploy` folder:
-   - `.env` for environment variables.
-   - `mkpipe_project.yaml` for your ETL configurations.
-3. Install the python packages
-   ```bash
-   pip install mkpipe mkpipe-extractor-postgres mkpipe-loader-postgres
-   ```
-4. Set the project directory environment variable:
-   ```bash
-   export MKPIPE_PROJECT_DIR={YOUR_PROJECT_PATH}
-   ```
-5. Start MkPipe using the following command:
-   ```bash
-   mkpipe run
-   ```
+## Python API
 
-## Documentation
+```python
+import mkpipe
 
-For more detailed documentation, please visit the [GitHub repository](https://github.com/mkpipe-etl/mkpipe).
+# Run all pipelines
+mkpipe.run(config="mkpipe_project.yaml")
+
+# Run a specific pipeline
+mkpipe.run(config="mkpipe_project.yaml", pipeline="my_pipeline")
+
+# Run a specific table
+mkpipe.run(config="mkpipe_project.yaml", table="stg_users")
+
+# Pass a custom SparkSession (e.g. AWS Glue, EMR)
+mkpipe.run(config="mkpipe_project.yaml", spark=my_spark_session)
+
+# Extract only — returns ExtractResult with a Spark DataFrame
+result = mkpipe.extract(config="mkpipe_project.yaml", table="stg_users")
+df = result.df
+
+# Load only — pass your own DataFrame
+mkpipe.load(config="mkpipe_project.yaml", table="stg_users", df=my_df)
+```
+
+## Orchestrator Integration
+
+### Dagster
+
+```python
+from dagster import asset, Definitions
+import mkpipe
+
+@asset
+def users():
+    mkpipe.run(config="mkpipe_project.yaml", table="stg_users")
+
+@asset
+def orders():
+    mkpipe.run(config="mkpipe_project.yaml", table="stg_orders")
+
+defs = Definitions(assets=[users, orders])
+```
+
+### Airflow
+
+```python
+from airflow.decorators import task
+
+@task
+def sync_users():
+    import mkpipe
+    mkpipe.run(config="/path/to/mkpipe_project.yaml", table="stg_users")
+```
+
+## Inline Transformations
+
+Add a `transform` field to any table in YAML:
+
+```yaml
+tables:
+  - name: public.products
+    target_name: stg_products
+    replication_method: full
+    transform: transforms/clean_products.py::transform
+```
+
+The transform function receives and returns a Spark DataFrame:
+
+```python
+# transforms/clean_products.py
+def transform(df):
+    df = df.filter(df.status != "deleted")
+    return df
+```
+
+## Backend (State Tracking)
+
+mkpipe tracks pipeline state (last sync point, status) in a manifest database. Default is SQLite (zero-config). PostgreSQL, DuckDB, and ClickHouse are also supported:
+
+```yaml
+settings:
+  backend:
+    variant: postgresql
+    host: localhost
+    port: 5432
+    database: mkpipe_db
+    user: mkpipe
+    password: ${BACKEND_PASSWORD}
+```
+
+Install optional backend dependencies:
+
+```bash
+pip install mkpipe[postgres-backend]
+pip install mkpipe[duckdb-backend]
+pip install mkpipe[clickhouse-backend]
+pip install mkpipe[all-backends]
+```
+
+## Available Plugins
+
+**For the full list, visit the [mkpipe-hub](https://github.com/mkpipe-etl/mkpipe-hub).**
+
+### Extractors
+- PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, SQLite, Redshift, ClickHouse, S3, Snowflake
+
+### Loaders
+- PostgreSQL, MySQL, MariaDB, SQLite, S3, Snowflake, ClickHouse
 
 ## License
 
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
-
-
-# Db Support Plan 
-
-**For actively supported databases/plugins, please visit the [MkPipe-hub repository!](https://github.com/mkpipe-etl/mkpipe-hub)**
-
-## Core Relational Databases  
-- [x]  PostgreSQL
-- [x]  MySQL
-- [x]  MariaDB
-- [x]  SQL Server
-- [x]  Oracle Database
-- [x]  SQLite
-- [ ]  Snowflake
-- [ ]  Google BigQuery
-- [x]  Amazon Redshift
-- [x]  ClickHouse
-- [x]  Amazon S3
----
-## NoSQL Databases  
-- [ ]  MongoDB
-- [ ]  Cassandra
-- [ ]  DynamoDB
-- [ ]  Redis
-- [ ]  Azure Data Lake Storage (ADLS)
-- [ ]  Google Cloud Storage
-- [ ]  Elasticsearch
-- [ ]  TimescaleDB
-- [ ]  HDFS
-- [ ]  InfluxDB
----
-## ERP/CRM Systems
-- [ ]  Salesforce  
-- [ ]  SAP  
-- [ ]  Microsoft Dynamics  
-- [ ]  NetSuite  
-- [ ]  Workday  
-- [ ]  HubSpot  
-- [ ]  Zoho CRM  
-- [ ]  Freshsales  
-- [ ]  Zendesk  
-- [ ]  Oracle NetSuite  
----
-## Emerging Databases & Analytical Tools
-Apache Druid  
-- [ ]  Vertica  
-- [ ]  SingleStore (MemSQL)  
-- [ ]  Exasol  
-- [ ]  SAP HANA  
-- [ ]  IBM Db2  
-- [ ]  Neo4j (Graph Database)  
-- [ ]  Greenplum  
-- [ ]  CockroachDB  
-- [ ]  AWS Athena  
----
-## Streaming Systems
-- [ ]  Kafka  
-- [ ]  RabbitMQ  
-- [ ]  Pulsar  
-- [ ]  Apache Flink  
-- [ ]  Amazon Kinesis  
-- [ ]  Google Pub/Sub  
-- [ ]  Azure Event Hubs  
-- [ ]  Apache NiFi  
-- [ ]  ActiveMQ  
-- [ ]  Redpanda  
----
-## File Formats & Data Lakes
-- [ ]  Parquet  
-- [ ]  Avro  
-- [ ]  JSON  
-- [ ]  CSV  
-- [ ]  XML  
-- [ ]  ORC  
-- [ ]  Google Drive (for raw files)  
-- [ ]  Dropbox  
-- [ ]  Box  
-- [ ]  FTP/SFTP Servers  
----
-## Specialized Analytics Tools
-- [ ]  Metabase (Data Visualization)  
-- [ ]  Tableau Data Extracts  
-- [ ]  Power BI  
-- [ ]  Looker  
-- [ ]  Google Analytics (GA4)  
-- [ ]  Mixpanel  
-- [ ]  Amplitude  
-- [ ]  Adobe Analytics  
-- [ ]  Heap  
-- [ ]  Klipfolio  
----
-## Industry-Specific Databases
-- [ ]  Aerospike  
-- [ ]  RocksDB  
-- [ ]  FaunaDB  
-- [ ]  ScyllaDB  
-- [ ]  ArangoDB  
-- [ ]  MarkLogic  
-- [ ]  CrateDB  
-- [ ]  TigerGraph  
-- [ ]  HarperDB  
-- [ ]  SAP ASE (Sybase)  
----
-## Legacy Databases
-- [ ]  Teradata  
-- [ ]  Netezza  
-- [ ]  Informix  
-- [ ]  Ingres  
-- [ ]  Firebird  
-- [ ]  Progress OpenEdge  
-- [ ]  ParAccel  
-- [ ]  MaxDB  
-- [ ]  HP Vertica  
-- [ ]  Sybase IQ  
----
-## Emerging Cloud & Hybrid Databases
-- [ ]  PlanetScale (MySQL-based)  
-- [ ]  YugabyteDB  
-- [ ]  TiDB  
-- [ ]  OceanBase  
-- [ ]  Citus (PostgreSQL-based)  
-- [ ]  Snowplow Analytics  
-- [ ]  Spanner (Google Cloud)  
-- [ ]  MariaDB ColumnStore  
-- [ ]  CockroachDB Serverless
-- [ ]  Weaviate (Vector Search)  
----
+Apache 2.0 — see [LICENSE](LICENSE).

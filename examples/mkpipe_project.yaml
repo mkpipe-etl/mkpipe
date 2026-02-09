@@ -1,0 +1,62 @@
+version: 2
+default_environment: prod
+
+prod:
+  settings:
+    timezone: UTC
+    backend:
+      variant: sqlite
+      database: mkpipe_manifest.db
+    spark:
+      driver_memory: 2g
+      executor_memory: 4g
+      extra_config:
+        spark.sql.shuffle.partitions: "4"
+
+  connections:
+    source_pg:
+      variant: postgresql
+      host: localhost
+      port: 5432
+      database: source_db
+      user: ${PG_USER}
+      password: ${PG_PASSWORD}
+      schema: public
+
+    target_pg:
+      variant: postgresql
+      host: localhost
+      port: 5432
+      database: dwh_db
+      user: ${PG_USER}
+      password: ${PG_PASSWORD}
+      schema: staging
+
+  pipelines:
+    - name: user_pipeline
+      source: source_pg
+      destination: target_pg
+      tables:
+        - name: public.users
+          target_name: stg_users
+          replication_method: incremental
+          iterate_column: updated_at
+          iterate_column_type: datetime
+          partitions_column: id
+          partitions_count: 10
+          fetchsize: 100000
+          batchsize: 100000
+
+        - name: public.orders
+          target_name: stg_orders
+          replication_method: full
+          fetchsize: 50000
+
+        - name: public.products
+          target_name: stg_products
+          replication_method: incremental
+          iterate_column: updated_at
+          iterate_column_type: datetime
+          partitions_column: id
+          custom_query_file: products.sql
+          transform: transforms/clean_products.py::transform

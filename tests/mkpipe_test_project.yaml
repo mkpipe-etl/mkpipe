@@ -1,0 +1,156 @@
+version: 2
+default_environment: test
+
+test:
+  settings:
+    timezone: UTC
+    backend:
+      variant: sqlite
+      database: mkpipe_test_manifest.db
+    spark:
+      driver_memory: 1g
+      executor_memory: 1g
+
+  connections:
+    # --- PostgreSQL source ---
+    pg_source:
+      variant: postgresql
+      host: localhost
+      port: 5432
+      database: source_db
+      user: mkpipe
+      password: mkpipe123
+      schema: public
+
+    # --- PostgreSQL target ---
+    pg_target:
+      variant: postgresql
+      host: localhost
+      port: 5433
+      database: target_db
+      user: mkpipe
+      password: mkpipe123
+      schema: public
+
+    # --- MySQL source ---
+    mysql_source:
+      variant: mysql
+      host: localhost
+      port: 3306
+      database: source_db
+      user: mkpipe
+      password: mkpipe123
+
+    # --- MariaDB source ---
+    mariadb_source:
+      variant: mariadb
+      host: localhost
+      port: 3307
+      database: source_db
+      user: mkpipe
+      password: mkpipe123
+
+    # --- ClickHouse source ---
+    clickhouse_source:
+      variant: clickhouse
+      host: localhost
+      port: 8123
+      database: source_db
+      user: mkpipe
+      password: mkpipe123
+
+    # --- MongoDB source ---
+    mongodb_source:
+      variant: mongodb
+      mongo_uri: mongodb://mkpipe:mkpipe123@localhost:27017/source_db?authSource=admin
+      database: source_db
+
+    # --- Redis source ---
+    redis_source:
+      variant: redis
+      host: localhost
+      port: 6379
+      password: mkpipe123
+      database: "0"
+
+    # --- Elasticsearch source ---
+    elasticsearch_source:
+      variant: elasticsearch
+      host: localhost
+      port: 9200
+
+    # --- TimescaleDB source ---
+    timescaledb_source:
+      variant: timescaledb
+      host: localhost
+      port: 5434
+      database: source_db
+      user: mkpipe
+      password: mkpipe123
+      schema: public
+
+  pipelines:
+    # --- Test 1: PostgreSQL → PostgreSQL (incremental) ---
+    - name: pg_to_pg_incremental
+      source: pg_source
+      destination: pg_target
+      tables:
+        - name: public.users
+          target_name: stg_users
+          replication_method: incremental
+          iterate_column: updated_at
+          iterate_column_type: datetime
+          partitions_column: id
+          partitions_count: 2
+          fetchsize: 1000
+          batchsize: 1000
+
+    # --- Test 2: PostgreSQL → PostgreSQL (full) ---
+    - name: pg_to_pg_full
+      source: pg_source
+      destination: pg_target
+      tables:
+        - name: public.orders
+          target_name: stg_orders
+          replication_method: full
+          fetchsize: 1000
+
+    # --- Test 3: MySQL → PostgreSQL ---
+    - name: mysql_to_pg
+      source: mysql_source
+      destination: pg_target
+      tables:
+        - name: products
+          target_name: stg_products_mysql
+          replication_method: full
+          fetchsize: 1000
+
+    # --- Test 4: MariaDB → PostgreSQL ---
+    - name: mariadb_to_pg
+      source: mariadb_source
+      destination: pg_target
+      tables:
+        - name: products
+          target_name: stg_products_mariadb
+          replication_method: full
+          fetchsize: 1000
+
+    # --- Test 5: ClickHouse → PostgreSQL ---
+    - name: clickhouse_to_pg
+      source: clickhouse_source
+      destination: pg_target
+      tables:
+        - name: events
+          target_name: stg_events_ch
+          replication_method: full
+          fetchsize: 1000
+
+    # --- Test 6: TimescaleDB → PostgreSQL ---
+    - name: timescaledb_to_pg
+      source: timescaledb_source
+      destination: pg_target
+      tables:
+        - name: sensor_data
+          target_name: stg_sensor_data
+          replication_method: full
+          fetchsize: 1000
