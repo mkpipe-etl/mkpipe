@@ -1,6 +1,8 @@
 import importlib.metadata
 from typing import Dict, Optional, Type
 
+from ..exceptions import PluginNotFoundError
+
 
 def _discover_plugins(group: str) -> Dict[str, Type]:
     plugins = {}
@@ -45,7 +47,7 @@ def get_extractor(variant: str) -> Type:
     if not cls:
         cls = discover_extractor(variant)
     if not cls:
-        raise ValueError(
+        raise PluginNotFoundError(
             f"No extractor found for variant: '{variant}'. "
             f"Install the appropriate plugin package, e.g. "
             f"'pip install mkpipe-extractor-{variant}'"
@@ -60,7 +62,7 @@ def get_loader(variant: str) -> Type:
     if not cls:
         cls = discover_loader(variant)
     if not cls:
-        raise ValueError(
+        raise PluginNotFoundError(
             f"No loader found for variant: '{variant}'. "
             f"Install the appropriate plugin package, e.g. "
             f"'pip install mkpipe-loader-{variant}'"

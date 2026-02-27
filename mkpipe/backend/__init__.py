@@ -1,13 +1,19 @@
-from .base import BackendBase
+from .base import BackendBase, retry
 from .sqlite import SqliteBackend
-from .postgres import PostgresBackend
-from .duckdb import DuckDBBackend
-from .clickhouse import ClickhouseBackend
 
-__all__ = (
-    'BackendBase',
-    'SqliteBackend',
-    'PostgresBackend',
-    'DuckDBBackend',
-    'ClickhouseBackend',
-)
+try:
+    from .postgres import PostgresBackend
+except ImportError:
+    pass
+
+try:
+    from .duckdb import DuckDBBackend
+except ImportError:
+    pass
+
+try:
+    from .clickhouse import ClickhouseBackend
+except ImportError:
+    pass
+
+__all__ = ('BackendBase', 'retry', 'SqliteBackend')

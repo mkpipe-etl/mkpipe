@@ -1,26 +1,7 @@
-import time
 from datetime import datetime, timedelta
-from functools import wraps
 from typing import Any, Dict, Optional
 
-from .base import BackendBase
-
-
-def _retry(max_attempts=5, delay=1):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            while attempts < max_attempts:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    attempts += 1
-                    if attempts >= max_attempts:
-                        raise
-                    time.sleep(delay)
-        return wrapper
-    return decorator
+from .base import BackendBase, retry
 
 
 class DuckDBBackend(BackendBase, variant='duckdb'):
@@ -51,7 +32,7 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
         finally:
             conn.close()
 
-    @_retry()
+    @retry()
     def get_table_status(self, pipeline_name: str, table_name: str) -> Optional[str]:
         conn = self._connect()
         try:
@@ -78,7 +59,7 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
         finally:
             conn.close()
 
-    @_retry()
+    @retry()
     def get_last_point(self, pipeline_name: str, table_name: str) -> Optional[str]:
         conn = self._connect()
         try:
@@ -91,7 +72,7 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
         finally:
             conn.close()
 
-    @_retry()
+    @retry()
     def manifest_table_update(
         self,
         pipeline_name: str,

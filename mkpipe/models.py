@@ -19,11 +19,13 @@ class TableConfig(BaseModel):
     partitions_column: Optional[str] = None
     partitions_count: int = 10
     fetchsize: int = 100_000
-    batchsize: int = 100_000
+    batchsize: int = 10_000
+    write_partitions: Optional[int] = None
     custom_query: Optional[str] = None
     custom_query_file: Optional[str] = None
     transform: Optional[str] = None
     pass_on_error: bool = False
+    dedup_columns: Optional[List[str]] = None
 
 
 class ConnectionConfig(BaseModel):
@@ -53,6 +55,7 @@ class ConnectionConfig(BaseModel):
 
 
 class SparkConfig(BaseModel):
+    master: Optional[str] = None
     driver_memory: Optional[str] = None
     executor_memory: Optional[str] = None
     extra_config: Dict[str, str] = Field(default_factory=dict)

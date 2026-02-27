@@ -6,6 +6,7 @@ from typing import Any, Dict, Union
 import yaml
 from dotenv import load_dotenv
 
+from .exceptions import ConfigError
 from .models import (
     BackendConfig,
     ConnectionConfig,
@@ -27,7 +28,7 @@ def _resolve_env_vars(value: Any) -> Any:
             var_name = match.group(1)
             env_val = os.environ.get(var_name)
             if env_val is None:
-                raise ValueError(
+                raise ConfigError(
                     f"Environment variable '{var_name}' is not set "
                     f"(referenced as '${{{var_name}}}')"
                 )
@@ -44,7 +45,7 @@ def _resolve_env_vars(value: Any) -> Any:
 def load_config(path: Union[str, Path]) -> MkpipeConfig:
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
+        raise ConfigError(f"Config file not found: {path}")
 
     with path.open('r') as f:
         raw = yaml.safe_load(f) or {}
@@ -52,7 +53,7 @@ def load_config(path: Union[str, Path]) -> MkpipeConfig:
     environment = raw.get('default_environment', 'prod')
     env_data = raw.get(environment)
     if env_data is None:
-        raise ValueError(
+        raise ConfigError(
             f"Environment '{environment}' not found in config file. "
             f"Available: {[k for k in raw.keys() if k != 'default_environment']}"
         )

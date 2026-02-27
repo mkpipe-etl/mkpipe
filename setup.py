@@ -30,6 +30,7 @@ setup(
         ],
         'mkpipe.extractors': [],
         'mkpipe.loaders': [],
+        'mkpipe.backends': [],
     },
     description='Spark-based modular ETL pipeline framework.',
     long_description=open('README.md').read(),

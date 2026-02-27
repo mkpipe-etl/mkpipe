@@ -2,10 +2,12 @@ import importlib.util
 import os
 from typing import Callable
 
+from ..exceptions import ConfigError
+
 
 def load_transform_fn(ref: str, base_dir: str = None) -> Callable:
     if '::' not in ref:
-        raise ValueError(
+        raise ConfigError(
             f"Invalid transform reference: '{ref}'. "
             f"Expected format: 'path/to/file.py::function_name'"
         )
@@ -18,7 +20,7 @@ def load_transform_fn(ref: str, base_dir: str = None) -> Callable:
     file_path = os.path.abspath(file_path)
 
     if not os.path.exists(file_path):
-        raise FileNotFoundError(
+        raise ConfigError(
             f"Transform file not found: '{file_path}'"
         )
 
@@ -28,12 +30,12 @@ def load_transform_fn(ref: str, base_dir: str = None) -> Callable:
 
     fn = getattr(module, fn_name, None)
     if fn is None:
-        raise AttributeError(
+        raise ConfigError(
             f"Function '{fn_name}' not found in '{file_path}'"
         )
 
     if not callable(fn):
-        raise TypeError(
+        raise ConfigError(
             f"'{fn_name}' in '{file_path}' is not callable"
         )
 

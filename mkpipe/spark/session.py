@@ -30,11 +30,13 @@ def create_spark_session(
 
     default_driver_mem, default_executor_mem = _default_memory()
 
+    master = 'local[*]'
     driver_memory = default_driver_mem
     executor_memory = default_executor_mem
     extra_config = {}
 
     if config:
+        master = config.master or 'local[*]'
         driver_memory = config.driver_memory or default_driver_mem
         executor_memory = config.executor_memory or default_executor_mem
         extra_config = config.extra_config or {}
@@ -48,7 +50,7 @@ def create_spark_session(
 
     conf = SparkConf()
     conf.setAppName(app_name)
-    conf.setMaster('local[*]')
+    conf.setMaster(master)
     conf.set('spark.driver.memory', driver_memory)
     conf.set('spark.executor.memory', executor_memory)
 
@@ -64,14 +66,9 @@ def create_spark_session(
     conf.set('spark.sql.parquet.int96RebaseModeInWrite', 'CORRECTED')
     conf.set('spark.serializer', 'org.apache.spark.serializer.KryoSerializer')
     conf.set('spark.kryoserializer.buffer.max', '1g')
-    conf.set('spark.dynamicAllocation.enabled', 'true')
-    conf.set('spark.dynamicAllocation.minExecutors', '1')
-    conf.set('spark.dynamicAllocation.maxExecutors', '2')
-    conf.set('spark.dynamicAllocation.initialExecutors', '1')
     conf.set('spark.sql.session.timeZone', timezone)
     conf.set('spark.driver.extraJavaOptions', driver_java_options)
     conf.set('spark.executor.extraJavaOptions', executor_java_options)
-    conf.set('spark.sql.shuffle.partitions', '4')
 
     for key, value in extra_config.items():
         conf.set(key, value)

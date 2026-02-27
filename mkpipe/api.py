@@ -1,8 +1,8 @@
-import os
 from pathlib import Path
 from typing import Optional, Union
 
 from .config import load_config
+from .exceptions import ConfigError, TransformError
 from .models import ExtractResult, MkpipeConfig, TableConfig
 from .utils import get_logger
 
@@ -74,8 +74,13 @@ def _run_table(
 
         # --- TRANSFORM ---
         if data.df is not None and transform_fn is not None:
-            logger.info({'table': target_name, 'status': 'transforming'})
-            data.df = transform_fn(data.df)
+            logger.info({'table': target_name, 'pipeline': pipeline_name, 'status': 'transforming'})
+            try:
+                data.df = transform_fn(data.df)
+            except Exception as e:
+                raise TransformError(
+                    f"Transform failed for '{target_name}': {e}"
+                ) from e
 
         # --- LOAD ---
         if data.df is not None:
@@ -122,8 +127,13 @@ def _run_table(
                 replication_method=replication_method,
                 error_message=error_msg,
             )
-        except Exception:
-            pass
+        except Exception as be:
+            logger.error({
+                'table': target_name,
+                'pipeline': pipeline_name,
+                'status': 'backend_update_failed',
+                'error': str(be),
+            })
 
         if not pass_on_error:
             raise
@@ -143,7 +153,7 @@ def run(
     if pipeline:
         pipelines = [p for p in pipelines if p.name == pipeline]
         if not pipelines:
-            raise ValueError(
+            raise ConfigError(
                 f"Pipeline '{pipeline}' not found. "
                 f"Available: {[p.name for p in cfg.pipelines]}"
             )
@@ -153,12 +163,12 @@ def run(
     for pipe in pipelines:
         source_conn = cfg.connections.get(pipe.source)
         if not source_conn:
-            raise ValueError(
+            raise ConfigError(
                 f"Connection '{pipe.source}' not found for pipeline '{pipe.name}'"
             )
         dest_conn = cfg.connections.get(pipe.destination)
         if not dest_conn:
-            raise ValueError(
+            raise ConfigError(
                 f"Connection '{pipe.destination}' not found for pipeline '{pipe.name}'"
             )
 
@@ -226,7 +236,7 @@ def extract(
                 last_point = backend.get_last_point(pipe.name, tbl.target_name)
                 return extractor.extract(tbl, spark, last_point=last_point)
 
-    raise ValueError(f"Table '{table}' not found in any pipeline")
+    raise ConfigError(f"Table '{table}' not found in any pipeline")
 
 
 def load(
@@ -258,4 +268,4 @@ def load(
                 loader.load(tbl, data, spark)
                 return
 
-    raise ValueError(f"Table '{table}' not found in any pipeline")
+    raise ConfigError(f"Table '{table}' not found in any pipeline")

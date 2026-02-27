@@ -1,26 +1,7 @@
-import time
 from datetime import datetime, timedelta
-from functools import wraps
 from typing import Any, Dict, Optional
 
-from .base import BackendBase
-
-
-def _retry(max_attempts=5, delay=1):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            while attempts < max_attempts:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    attempts += 1
-                    if attempts >= max_attempts:
-                        raise
-                    time.sleep(delay)
-        return wrapper
-    return decorator
+from .base import BackendBase, retry
 
 
 class ClickhouseBackend(BackendBase, variant='clickhouse'):
@@ -54,7 +35,7 @@ class ClickhouseBackend(BackendBase, variant='clickhouse'):
             ORDER BY (pipeline_name, table_name)
         """)
 
-    @_retry()
+    @retry()
     def get_table_status(self, pipeline_name: str, table_name: str) -> Optional[str]:
         client = self._connect()
         result = client.query(
@@ -76,7 +57,7 @@ class ClickhouseBackend(BackendBase, variant='clickhouse'):
 
         return status
 
-    @_retry()
+    @retry()
     def get_last_point(self, pipeline_name: str, table_name: str) -> Optional[str]:
         client = self._connect()
         result = client.query(
@@ -88,7 +69,7 @@ class ClickhouseBackend(BackendBase, variant='clickhouse'):
             return None
         return result.result_rows[0][0]
 
-    @_retry()
+    @retry()
     def manifest_table_update(
         self,
         pipeline_name: str,

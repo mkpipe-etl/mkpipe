@@ -3,10 +3,9 @@ from datetime import datetime
 from typing import Dict
 from urllib.parse import quote_plus
 
-from pyspark.sql import functions as F
-from pyspark.sql.types import TimestampType
-
 from .base import BaseLoader
+from .columns import add_etl_columns
+from ..exceptions import LoadError
 from ..models import ConnectionConfig, ExtractResult, TableConfig
 from ..utils import get_logger
 
@@ -39,12 +38,6 @@ class JdbcLoader(BaseLoader):
         """Override in subclass for extra JDBC properties (RSA key, SSL, OAuth, etc.)"""
         return {}
 
-    def _add_custom_columns(self, df, etl_time: datetime):
-        if 'etl_time' in df.columns:
-            df = df.drop('etl_time')
-        df = df.withColumn('etl_time', F.lit(etl_time).cast(TimestampType()))
-        return df
-
     def _write_df(self, df, write_mode: str, table_name: str, batchsize: int):
         jdbc_url = self.build_jdbc_url()
         writer = (
@@ -75,17 +68,21 @@ class JdbcLoader(BaseLoader):
             })
             return
 
-        etl_time = datetime.now()
-        df = self._add_custom_columns(df, etl_time)
+        df = add_etl_columns(df, datetime.now(), dedup_columns=table.dedup_columns)
+
+        if table.write_partitions:
+            df = df.coalesce(table.write_partitions)
 
         logger.info({
             'table': target_name,
             'status': 'loading',
             'write_mode': write_mode,
-            'partitions': df.rdd.getNumPartitions(),
         })
 
-        self._write_df(df, write_mode, target_name, batchsize)
+        try:
+            self._write_df(df, write_mode, target_name, batchsize)
+        except Exception as e:
+            raise LoadError(f"Failed to write '{target_name}': {e}") from e
 
         logger.info({
             'table': target_name,

@@ -3,6 +3,7 @@ from urllib.parse import quote_plus
 from typing import Dict, Optional
 
 from .base import BaseExtractor
+from ..exceptions import ConfigError
 from ..models import ConnectionConfig, ExtractResult, TableConfig
 from ..utils import get_logger
 
@@ -70,80 +71,107 @@ class JdbcExtractor(BaseExtractor):
 
     def _extract_incremental(self, table: TableConfig, spark, last_point: Optional[str]) -> ExtractResult:
         name = table.name
+        iterate_column = table.iterate_column
         iterate_column_type = table.iterate_column_type
         custom_query = self._resolve_custom_query(table)
 
-        partitions_count = table.partitions_count
-        partitions_column_raw = table.partitions_column or table.iterate_column
-        if not partitions_column_raw:
-            raise ValueError(
-                f"Table '{name}': incremental replication requires "
-                f"'iterate_column' or 'partitions_column'"
+        if not iterate_column:
+            raise ConfigError(
+                f"Table '{name}': incremental replication requires 'iterate_column'"
             )
 
+        partitions_count = table.partitions_count
+        partitions_column_raw = table.partitions_column or iterate_column
         partitions_column = self._normalize_partitions_column(partitions_column_raw)
         p_col_name = partitions_column_raw.split(' as ')[-1].strip()
         fetchsize = table.fetchsize
         jdbc_url = self.build_jdbc_url()
 
-        iterate_query = (
-            f"(SELECT min({partitions_column}) AS min_val, "
-            f"max({partitions_column}) AS max_val, "
-            f"count(*) AS record_count FROM "
-        )
+        # --- Step 1: Get iterate_column bounds for the new data window ---
+        iterate_col_normalized = self._normalize_partitions_column(iterate_column)
 
         if last_point:
-            iterate_query += f"{name} WHERE {partitions_column} > '{last_point}') q"
+            bounds_query = (
+                f"(SELECT min({iterate_col_normalized}) AS min_val, "
+                f"max({iterate_col_normalized}) AS max_val "
+                f"FROM {name} WHERE {iterate_col_normalized} >= '{last_point}') q"
+            )
             write_mode = 'append'
         else:
-            iterate_query += f"{name}) q"
+            bounds_query = (
+                f"(SELECT min({iterate_col_normalized}) AS min_val, "
+                f"max({iterate_col_normalized}) AS max_val "
+                f"FROM {name}) q"
+            )
             write_mode = 'overwrite'
 
-        df_bounds = self._build_reader(spark, jdbc_url, iterate_query)
-
+        df_bounds = self._build_reader(spark, jdbc_url, bounds_query)
         row = df_bounds.first()
-        min_val, max_val, record_count = row[0], row[1], row[2]
 
-        if not row or record_count == 0:
+        if not row or row[0] is None:
             if not last_point:
                 return self._extract_full(table, spark)
+            logger.info({'table': table.target_name, 'status': 'no_new_data'})
             return ExtractResult(df=None, write_mode=write_mode)
 
+        min_val, max_val = row[0], row[1]
+
         if iterate_column_type == 'int':
-            min_filter = int(min_val)
-            max_filter = int(max_val)
-            filter_clause = (
-                f"WHERE {partitions_column} >= {min_filter} "
-                f"AND {partitions_column} <= {max_filter}"
-            )
+            min_iterate = int(min_val)
+            max_iterate = int(max_val)
         elif iterate_column_type == 'datetime':
-            min_filter = min_val.strftime('%Y-%m-%d %H:%M:%S.%f')
-            max_filter = max_val.strftime('%Y-%m-%d %H:%M:%S.%f')
+            min_iterate = min_val.strftime('%Y-%m-%d %H:%M:%S.%f')
+            max_iterate = max_val.strftime('%Y-%m-%d %H:%M:%S.%f')
+        else:
+            raise ConfigError(
+                f"Table '{name}': unsupported iterate_column_type '{iterate_column_type}'. "
+                f"Supported: 'int', 'datetime'"
+            )
+
+        # --- Step 2: Build filter clause using iterate_column ---
+        if iterate_column_type == 'int':
             filter_clause = (
-                f"WHERE {partitions_column} >= '{min_filter}' "
-                f"AND {partitions_column} <= '{max_filter}'"
+                f"WHERE {iterate_col_normalized} >= {min_iterate} "
+                f"AND {iterate_col_normalized} <= {max_iterate}"
             )
         else:
-            raise ValueError(f"Unsupported iterate_column_type: {iterate_column_type}")
+            filter_clause = (
+                f"WHERE {iterate_col_normalized} >= '{min_iterate}' "
+                f"AND {iterate_col_normalized} <= '{max_iterate}'"
+            )
 
         if custom_query:
             updated_query = custom_query.replace('{query_filter}', f' {filter_clause} ')
         else:
             updated_query = f'(SELECT * FROM {name} {filter_clause}) q'
 
+        # --- Step 3: Resolve partition bounds (may differ from iterate bounds) ---
+        if partitions_count and partitions_column != iterate_col_normalized:
+            p_bounds_query = (
+                f"(SELECT min({partitions_column}) AS p_min, "
+                f"max({partitions_column}) AS p_max "
+                f"FROM {name} {filter_clause}) q"
+            )
+            p_row = self._build_reader(spark, jdbc_url, p_bounds_query).first()
+            p_lower = p_row[0] if p_row and p_row[0] is not None else min_iterate
+            p_upper = p_row[1] if p_row and p_row[1] is not None else max_iterate
+        else:
+            p_lower = min_iterate
+            p_upper = max_iterate
+
         df = self._build_reader(
             spark, jdbc_url, updated_query,
             fetchsize=fetchsize,
             partitions=partitions_count,
             partition_column=p_col_name,
-            lower_bound=min_filter,
-            upper_bound=max_filter,
+            lower_bound=p_lower,
+            upper_bound=p_upper,
         )
 
         return ExtractResult(
             df=df,
             write_mode=write_mode,
-            last_point_value=str(max_filter),
+            last_point_value=str(max_iterate),
         )
 
     def _extract_full(self, table: TableConfig, spark) -> ExtractResult:

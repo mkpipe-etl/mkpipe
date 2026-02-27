@@ -1,27 +1,8 @@
 import sqlite3
-import time
 from datetime import datetime, timedelta
-from functools import wraps
 from typing import Any, Dict, Optional
 
-from .base import BackendBase
-
-
-def _retry(max_attempts=5, delay=1):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            while attempts < max_attempts:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    attempts += 1
-                    if attempts >= max_attempts:
-                        raise
-                    time.sleep(delay)
-        return wrapper
-    return decorator
+from .base import BackendBase, retry
 
 
 class SqliteBackend(BackendBase, variant='sqlite'):
@@ -49,7 +30,7 @@ class SqliteBackend(BackendBase, variant='sqlite'):
             """)
             conn.commit()
 
-    @_retry()
+    @retry()
     def get_table_status(self, pipeline_name: str, table_name: str) -> Optional[str]:
         with self._connect() as conn:
             cursor = conn.execute(
@@ -84,7 +65,7 @@ class SqliteBackend(BackendBase, variant='sqlite'):
 
             return status
 
-    @_retry()
+    @retry()
     def get_last_point(self, pipeline_name: str, table_name: str) -> Optional[str]:
         with self._connect() as conn:
             cursor = conn.execute(
@@ -95,7 +76,7 @@ class SqliteBackend(BackendBase, variant='sqlite'):
             result = cursor.fetchone()
             return result[0] if result else None
 
-    @_retry()
+    @retry()
     def manifest_table_update(
         self,
         pipeline_name: str,

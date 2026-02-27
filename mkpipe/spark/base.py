@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Type
 
+from ..exceptions import PluginNotFoundError
 from ..models import ExtractResult, TableConfig
 
 
@@ -19,7 +20,7 @@ class BaseExtractor(ABC):
             from ..plugins.registry import discover_extractor
             extractor_class = discover_extractor(variant)
         if not extractor_class:
-            raise ValueError(
+            raise PluginNotFoundError(
                 f"No extractor found for variant: '{variant}'. "
                 f"Available: {list(cls._registry.keys())}"
             )
@@ -45,7 +46,7 @@ class BaseLoader(ABC):
             from ..plugins.registry import discover_loader
             loader_class = discover_loader(variant)
         if not loader_class:
-            raise ValueError(
+            raise PluginNotFoundError(
                 f"No loader found for variant: '{variant}'. "
                 f"Available: {list(cls._registry.keys())}"
             )
