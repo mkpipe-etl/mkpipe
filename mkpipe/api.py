@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import List, Optional, Sequence, Union
 
 from .config import load_config
 from .exceptions import ConfigError, TransformError
@@ -13,6 +13,16 @@ def _get_config(config: Union[str, Path, MkpipeConfig]) -> MkpipeConfig:
     if isinstance(config, MkpipeConfig):
         return config
     return load_config(config)
+
+
+def _filter_tables_by_tags(
+    tables: Sequence[TableConfig],
+    tags: Optional[List[str]],
+) -> List[TableConfig]:
+    if not tags:
+        return list(tables)
+    tag_set = set(tags)
+    return [t for t in tables if tag_set & set(t.tags)]
 
 
 def _ensure_spark(spark, cfg: MkpipeConfig):
@@ -143,6 +153,7 @@ def run(
     config: Union[str, Path, MkpipeConfig],
     pipeline: Optional[str] = None,
     table: Optional[str] = None,
+    tags: Optional[List[str]] = None,
     spark=None,
 ):
     cfg = _get_config(config)
@@ -184,6 +195,7 @@ def run(
                 t for t in tables
                 if t.name == table or t.target_name == table
             ]
+        tables = _filter_tables_by_tags(tables, tags)
 
         for tbl in tables:
             transform_fn = None
@@ -212,6 +224,7 @@ def extract(
     config: Union[str, Path, MkpipeConfig],
     table: str,
     pipeline: Optional[str] = None,
+    tags: Optional[List[str]] = None,
     spark=None,
 ) -> ExtractResult:
     cfg = _get_config(config)
@@ -229,7 +242,8 @@ def extract(
         if not source_conn:
             continue
 
-        for tbl in pipe.tables:
+        filtered = _filter_tables_by_tags(pipe.tables, tags)
+        for tbl in filtered:
             if tbl.name == table or tbl.target_name == table:
                 extractor_cls = get_extractor(source_conn.variant)
                 extractor = extractor_cls(connection=source_conn)

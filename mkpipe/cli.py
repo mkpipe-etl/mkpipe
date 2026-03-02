@@ -24,7 +24,12 @@ def cli():
     default=None,
     help='Run only the specified table.',
 )
-def run(config, pipeline, table):
+@click.option(
+    '--tags',
+    default=None,
+    help='Comma-separated tags to filter tables, e.g. --tags api,ingestion',
+)
+def run(config, pipeline, table, tags):
     from .api import run as api_run
 
     config_file = config or os.path.join(os.getcwd(), 'mkpipe_project.yaml')
@@ -34,7 +39,8 @@ def run(config, pipeline, table):
         raise SystemExit(1)
 
     click.echo(f'Running mkpipe with config: {config_file}')
-    api_run(config=config_file, pipeline=pipeline, table=table)
+    tag_list = [t.strip() for t in tags.split(',')] if tags else None
+    api_run(config=config_file, pipeline=pipeline, table=table, tags=tag_list)
     click.echo('Done.')
 
 

@@ -96,6 +96,7 @@ test:
       destination: pg_target
       tables:
         - name: public.users
+          tags: [api, ingestion]
           target_name: stg_users
           replication_method: incremental
           iterate_column: updated_at

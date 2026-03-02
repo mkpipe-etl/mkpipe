@@ -24,6 +24,7 @@ class TableConfig(BaseModel):
     custom_query: Optional[str] = None
     custom_query_file: Optional[str] = None
     transform: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
     pass_on_error: bool = False
     dedup_columns: Optional[List[str]] = None
 
