@@ -32,10 +32,11 @@ def _ensure_spark(spark, cfg: MkpipeConfig):
     from .plugins.jars import collect_jars
     from .spark.session import create_spark_session
 
-    jars = collect_jars()
+    jars, packages = collect_jars()
     return create_spark_session(
         config=cfg.settings.spark,
         jars=jars,
+        packages=packages,
         timezone=cfg.settings.timezone,
     )
 

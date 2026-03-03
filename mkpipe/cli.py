@@ -44,5 +44,13 @@ def run(config, pipeline, table, tags):
     click.echo('Done.')
 
 
+@cli.command('install-jars', help='Download Maven JARs for all installed plugins. Use for offline/Docker builds.')
+def install_jars():
+    from .plugins.jars import download_jars
+
+    click.echo('Downloading JARs for installed mkpipe plugins...')
+    download_jars()
+
+
 if __name__ == '__main__':
     cli()

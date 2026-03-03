@@ -119,14 +119,17 @@ mkpipe.load(config="mkpipe_project.yaml", table="stg_users", df=my_df)
 
 ```bash
 mkpipe run [OPTIONS]
+mkpipe install-jars
 ```
 
-| Option | Short | Description |
+| Command / Option | Short | Description |
 |---|---|---|
+| `mkpipe run` | | Run pipelines from config file |
 | `--config` | `-c` | Path to config file. Default: `mkpipe_project.yaml` in current dir |
 | `--pipeline` | `-p` | Run only the named pipeline |
 | `--table` | `-t` | Run only the named table (source name or target name) |
 | `--tags` | | Comma-separated tags to filter tables, e.g. `--tags api,ingestion` |
+| `mkpipe install-jars` | | Download Maven JARs for all installed plugins (offline/Docker use) |
 
 Examples:
 
@@ -476,6 +479,67 @@ from mkpipe import (
     PluginNotFoundError,  # missing plugin
     BackendError,         # backend manifest failures
 )
+```
+
+---
+
+## JAR Management
+
+mkpipe plugins that depend on JDBC drivers or Spark connectors need JAR files. mkpipe handles this **automatically** — no manual steps required for most users.
+
+### Online (Default) — Lazy Download
+
+When mkpipe starts, it detects which plugins are installed and resolves their Maven dependencies via `spark.jars.packages`. JARs are downloaded on first run and cached by Spark's Ivy resolver.
+
+```
+# Nothing to do — just run your pipeline
+mkpipe run
+```
+
+### Offline / Docker — Pre-download JARs
+
+For **air-gapped** or **on-premise** environments without internet access, pre-download all JARs during the Docker build:
+
+```bash
+mkpipe install-jars
+```
+
+This command:
+1. Discovers all installed plugins and their Maven dependencies
+2. Downloads JARs via Spark's Ivy resolver into a temp directory
+3. Copies them into each plugin's `jars/` directory
+4. Cleans up the temp Ivy cache
+
+**Dockerfile example:**
+
+```dockerfile
+FROM python:3.11-slim
+
+# Install Java (required for PySpark)
+RUN apt-get update && apt-get install -y default-jdk && rm -rf /var/lib/apt/lists/*
+
+# Install mkpipe and plugins
+RUN pip install mkpipe mkpipe-extractor-postgres mkpipe-loader-clickhouse
+
+# Pre-download JARs (no internet needed at runtime)
+RUN mkpipe install-jars
+
+COPY mkpipe_project.yaml .
+CMD ["mkpipe", "run"]
+```
+
+### How It Works
+
+| Scenario | Local JARs in `jars/` | Maven resolution |
+|---|---|---|
+| Fresh install, online | No | Yes — `spark.jars.packages` |
+| After `mkpipe install-jars` | Yes | No — local JARs used |
+| Plugin with custom JAR (e.g. MongoDB `mkpipe-tls-helper.jar`) | Yes (custom) | Yes — only for missing Maven deps |
+
+### CLI Reference
+
+```bash
+mkpipe install-jars    # Download all Maven JARs for installed plugins
 ```
 
 ---

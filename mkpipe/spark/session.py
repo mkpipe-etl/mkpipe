@@ -22,6 +22,7 @@ def _default_memory():
 def create_spark_session(
     config: Optional[SparkConfig] = None,
     jars: str = '',
+    packages: str = '',
     timezone: str = 'UTC',
     app_name: str = 'mkpipe',
 ):
@@ -58,6 +59,9 @@ def create_spark_session(
         conf.set('spark.jars', jars)
         conf.set('spark.driver.extraClassPath', jars)
         conf.set('spark.executor.extraClassPath', jars)
+
+    if packages:
+        conf.set('spark.jars.packages', packages)
 
     conf.set('spark.network.timeout', '600s')
     conf.set('spark.sql.parquet.datetimeRebaseModeInRead', 'CORRECTED')
