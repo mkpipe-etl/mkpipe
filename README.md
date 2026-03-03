@@ -549,10 +549,10 @@ mkpipe install-jars    # Download all Maven JARs for installed plugins
 **For the full list, visit the [mkpipe-hub](https://github.com/mkpipe-etl/mkpipe-hub).**
 
 ### Extractors
-- PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, SQLite, Redshift, ClickHouse, MongoDB, File (S3/GCS/local), Snowflake
+- PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, SQLite, Redshift, ClickHouse, MongoDB, Snowflake, BigQuery, Cassandra, TimescaleDB, DynamoDB, Elasticsearch, InfluxDB, Redis, File (S3/GCS/local/Iceberg/Delta)
 
 ### Loaders
-- PostgreSQL, MySQL, MariaDB, SQLite, File (S3/GCS/local), Snowflake, ClickHouse
+- PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, SQLite, Redshift, ClickHouse, MongoDB, Snowflake, BigQuery, Cassandra, TimescaleDB, DynamoDB, Elasticsearch, InfluxDB, Redis, File (S3/GCS/local/Iceberg/Delta)
 
 ---
 
