@@ -27,6 +27,8 @@ class TableConfig(BaseModel):
     tags: List[str] = Field(default_factory=list)
     pass_on_error: bool = False
     dedup_columns: Optional[List[str]] = None
+    partitioner: Optional[str] = None
+    partitioner_options: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ConnectionConfig(BaseModel):

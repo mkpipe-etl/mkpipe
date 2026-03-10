@@ -155,3 +155,17 @@ test:
           target_name: stg_sensor_data
           replication_method: full
           fetchsize: 1000
+
+    # --- Test 7: MongoDB → PostgreSQL (with partitioner) ---
+    - name: mongodb_to_pg
+      source: mongodb_source
+      destination: pg_target
+      tables:
+        - name: events
+          target_name: stg_events_mongo
+          replication_method: full
+          partitioner: MongoSamplePartitioner
+          partitioner_options:
+            partition.size: 64
+            samples.per.partition: 10
+          write_partitions: 4
