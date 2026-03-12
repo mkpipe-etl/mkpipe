@@ -30,6 +30,14 @@ class TableConfig(BaseModel):
     dedup_columns: Optional[List[str]] = None
     partitioner: Optional[str] = None
     partitioner_options: Dict[str, Any] = Field(default_factory=dict)
+    iceberg_partition_by: Optional[List[str]] = None
+    iceberg_sort_by: Optional[List[str]] = None
+    iceberg_properties: Dict[str, str] = Field(default_factory=dict)
+    iceberg_schema_evolution: str = 'merge'
+    delta_partition_by: Optional[List[str]] = None
+    delta_z_order_by: Optional[List[str]] = None
+    delta_properties: Dict[str, str] = Field(default_factory=dict)
+    delta_schema_evolution: str = 'merge'
 
 
 class ConnectionConfig(BaseModel):
