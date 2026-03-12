@@ -5,11 +5,18 @@ from ..models import SparkConfig
 
 
 def _get_container_memory_limit():
-    try:
-        with open('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'r') as f:
-            return int(f.read()) // (1024 * 1024)
-    except Exception:
-        return psutil.virtual_memory().total // (1024 * 1024)
+    for path in (
+        '/sys/fs/cgroup/memory.max',
+        '/sys/fs/cgroup/memory/memory.limit_in_bytes',
+    ):
+        try:
+            with open(path, 'r') as f:
+                value = f.read().strip()
+                if value not in ('max', ''):
+                    return int(value) // (1024 * 1024)
+        except Exception:
+            continue
+    return psutil.virtual_memory().total // (1024 * 1024)
 
 
 def _default_memory():
@@ -66,8 +73,6 @@ def create_spark_session(
     conf.set('spark.network.timeout', '600s')
     conf.set('spark.sql.parquet.datetimeRebaseModeInRead', 'CORRECTED')
     conf.set('spark.sql.parquet.datetimeRebaseModeInWrite', 'CORRECTED')
-    conf.set('spark.sql.parquet.int96RebaseModeInRead', 'CORRECTED')
-    conf.set('spark.sql.parquet.int96RebaseModeInWrite', 'CORRECTED')
     conf.set('spark.serializer', 'org.apache.spark.serializer.KryoSerializer')
     conf.set('spark.kryoserializer.buffer.max', '1g')
     conf.set('spark.sql.session.timeZone', timezone)
