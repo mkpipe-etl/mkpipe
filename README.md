@@ -33,7 +33,7 @@ prod:
 
   connections:
     source_pg:
-      variant: postgresql
+      variant: postgres
       host: localhost
       port: 5432
       database: source_db
@@ -42,7 +42,7 @@ prod:
       schema: public
 
     target_pg:
-      variant: postgresql
+      variant: postgres
       host: localhost
       port: 5432
       database: dwh_db
@@ -246,7 +246,7 @@ settings:
 ```yaml
 connections:
   my_postgres:
-    variant: postgresql
+    variant: postgres
     host: ${PG_HOST}
     port: 5432
     database: mydb
@@ -446,7 +446,7 @@ mkpipe tracks pipeline state (last sync point, status) in a manifest database. D
 ```yaml
 settings:
   backend:
-    variant: postgresql
+    variant: postgres
     host: localhost
     port: 5432
     database: mkpipe_db

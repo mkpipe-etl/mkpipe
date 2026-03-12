@@ -14,7 +14,7 @@ test:
   connections:
     # --- PostgreSQL source ---
     pg_source:
-      variant: postgresql
+      variant: postgres
       host: localhost
       port: 5432
       database: source_db
@@ -24,7 +24,7 @@ test:
 
     # --- PostgreSQL target ---
     pg_target:
-      variant: postgresql
+      variant: postgres
       host: localhost
       port: 5433
       database: target_db
