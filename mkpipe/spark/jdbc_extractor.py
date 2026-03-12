@@ -153,8 +153,36 @@ class JdbcExtractor(BaseExtractor):
                 f"FROM {name} {filter_clause}) q"
             )
             p_row = self._build_reader(spark, jdbc_url, p_bounds_query).first()
-            p_lower = p_row[0] if p_row and p_row[0] is not None else min_iterate
-            p_upper = p_row[1] if p_row and p_row[1] is not None else max_iterate
+            p_lower_raw = p_row[0] if p_row and p_row[0] is not None else min_iterate
+            p_upper_raw = p_row[1] if p_row and p_row[1] is not None else max_iterate
+            
+            # Determine partition column type:
+            # 1. If partitions_column_type explicitly set, use it
+            # 2. If partitions_column specified but type not set, default to 'int'
+            # 3. If partitions_column not specified, use iterate_column_type
+            if table.partitions_column_type:
+                p_col_type = table.partitions_column_type
+            elif table.partitions_column:
+                p_col_type = 'int'
+            else:
+                p_col_type = iterate_column_type
+            
+            if p_col_type == 'int':
+                # Handle NUMERIC/DECIMAL types from PostgreSQL that come as decimal strings
+                p_lower = int(float(str(p_lower_raw)))
+                p_upper = int(float(str(p_upper_raw)))
+            elif p_col_type == 'datetime':
+                # Handle datetime types
+                if hasattr(p_lower_raw, 'strftime'):
+                    p_lower = p_lower_raw.strftime('%Y-%m-%d %H:%M:%S.%f')
+                    p_upper = p_upper_raw.strftime('%Y-%m-%d %H:%M:%S.%f')
+                else:
+                    p_lower = str(p_lower_raw)
+                    p_upper = str(p_upper_raw)
+            else:
+                # Fallback: keep raw values
+                p_lower = p_lower_raw
+                p_upper = p_upper_raw
         else:
             p_lower = min_iterate
             p_upper = max_iterate

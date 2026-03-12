@@ -17,6 +17,7 @@ class TableConfig(BaseModel):
     iterate_column: Optional[str] = None
     iterate_column_type: Optional[str] = None
     partitions_column: Optional[str] = None
+    partitions_column_type: Optional[str] = None
     partitions_count: int = 10
     fetchsize: int = 100_000
     batchsize: int = 10_000

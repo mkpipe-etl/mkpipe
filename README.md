@@ -336,6 +336,7 @@ pipelines:
 | `iterate_column` | `None` | Column for incremental tracking (required if incremental) |
 | `iterate_column_type` | `None` | `datetime` or `int` |
 | `partitions_column` | iterate_column | Column for Spark JDBC partitioning |
+| `partitions_column_type` | auto | Type of partition column: `int` or `datetime`. Defaults to `int` if `partitions_column` is specified, otherwise inherits `iterate_column_type` |
 | `partitions_count` | `10` | Number of JDBC read partitions |
 | `fetchsize` | `100000` | JDBC fetch size (rows per network round trip) |
 | `batchsize` | `10000` | JDBC write batch size |
@@ -365,6 +366,41 @@ An `etl_time` timestamp is always added to every row.
   iterate_column: updated_at
   iterate_column_type: datetime
   dedup_columns: [id, updated_at]  # mkpipe_id = xxhash64(id, updated_at)
+```
+
+### Partition Column Type Behavior
+
+The `partitions_column_type` parameter controls how partition bounds are converted for Spark JDBC partitioning:
+
+**Scenario 1: No partition column specified (default)**
+```yaml
+- name: public.orders
+  replication_method: incremental
+  iterate_column: created_at
+  iterate_column_type: datetime
+  # partitions_column defaults to created_at
+  # partitions_column_type inherits datetime from iterate_column_type
+```
+
+**Scenario 2: Integer partition column specified**
+```yaml
+- name: public.customers
+  replication_method: incremental
+  iterate_column: updated_at
+  iterate_column_type: datetime
+  partitions_column: customer_id
+  # partitions_column_type defaults to 'int' (most partition keys are integers)
+  # Handles PostgreSQL NUMERIC/DECIMAL types correctly
+```
+
+**Scenario 3: Explicit datetime partition column**
+```yaml
+- name: public.events
+  replication_method: incremental
+  iterate_column: event_id
+  iterate_column_type: int
+  partitions_column: event_timestamp
+  partitions_column_type: datetime  # Must be explicit if different from iterate_column_type
 ```
 
 Downstream dedup query example:
