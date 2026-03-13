@@ -72,11 +72,52 @@ class Logger:
 
 
 def set_log_dir(log_dir: Optional[str]) -> None:
+    """Set global log directory and add file handler to all existing loggers."""
     global _GLOBAL_LOG_DIR
+    if log_dir is None or log_dir == _GLOBAL_LOG_DIR:
+        return
     _GLOBAL_LOG_DIR = log_dir
+
+    log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    file_path = log_path / 'mkpipe.log'
+
+    frmt = (
+        '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
+        '"log": %(message)s, "module": "%(name)s"}'
+    )
+    json_formatter = logging.Formatter(frmt)
+    json_formatter.converter = time.gmtime
+
+    fh = logging.handlers.TimedRotatingFileHandler(
+        file_path, when='midnight', backupCount=7
+    )
+    fh.setLevel(_DEFAULT_LOG_LEVEL)
+    fh.setFormatter(json_formatter)
+
+    # Add file handler to all existing mkpipe loggers
+    for name, existing_logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(existing_logger, logging.Logger) and not any(
+            isinstance(h, logging.handlers.TimedRotatingFileHandler)
+            for h in existing_logger.handlers
+        ):
+            existing_logger.addHandler(fh)
+
+    # Store handler so new loggers also get it
+    _FILE_HANDLERS.append(fh)
+
+
+_FILE_HANDLERS: list = []
 
 
 def get_logger(name: str, log_dir: Optional[str] = None) -> Logger:
     if log_dir is None:
         log_dir = _GLOBAL_LOG_DIR
-    return Logger(name, log_dir)
+    logger_instance = Logger(name, log_dir)
+
+    # Attach any previously created file handlers
+    for fh in _FILE_HANDLERS:
+        if fh not in logger_instance.logger.handlers:
+            logger_instance.logger.addHandler(fh)
+
+    return logger_instance
