@@ -64,6 +64,7 @@ def load_config(path: Union[str, Path]) -> MkpipeConfig:
     settings_raw = env_data.get('settings', {})
     settings = SettingsConfig(
         timezone=settings_raw.get('timezone', 'UTC'),
+        log_dir=settings_raw.get('log_dir'),
         backend=BackendConfig(**settings_raw.get('backend', {})),
         spark=SparkConfig(**settings_raw.get('spark', {})),
     )
