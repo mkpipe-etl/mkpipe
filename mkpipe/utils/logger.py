@@ -19,6 +19,44 @@ _LOG_LEVELS = {
 }
 _DEFAULT_LOG_LEVEL = _LOG_LEVELS.get(_LOG_LEVEL.lower(), logging.INFO)
 
+_LOG_FORMAT = (
+    '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
+    '"log": %(message)s, "module": "%(name)s"}'
+)
+
+_file_handler_installed = False
+
+
+def _install_file_handler(log_dir: str) -> None:
+    """Add a file handler to the root logger so every logger writes to file."""
+    global _file_handler_installed
+    if _file_handler_installed:
+        return
+
+    log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    file_path = log_path / 'mkpipe.log'
+
+    json_formatter = logging.Formatter(_LOG_FORMAT)
+    json_formatter.converter = time.gmtime
+
+    fh = logging.handlers.TimedRotatingFileHandler(
+        file_path, when='midnight', backupCount=7
+    )
+    fh.setLevel(_DEFAULT_LOG_LEVEL)
+    fh.setFormatter(json_formatter)
+
+    root = logging.getLogger()
+    root.addHandler(fh)
+    if root.level > _DEFAULT_LOG_LEVEL:
+        root.setLevel(_DEFAULT_LOG_LEVEL)
+    _file_handler_installed = True
+
+
+# If env var is set at import time, install immediately
+if _GLOBAL_LOG_DIR:
+    _install_file_handler(_GLOBAL_LOG_DIR)
+
 
 class Logger:
     def __init__(self, name: str, log_dir: Optional[str] = None):
@@ -27,23 +65,8 @@ class Logger:
         if not self.logger.handlers:
             self.logger.setLevel(_DEFAULT_LOG_LEVEL)
 
-            frmt = (
-                '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
-                '"log": %(message)s, "module": "%(name)s"}'
-            )
-            json_formatter = logging.Formatter(frmt)
+            json_formatter = logging.Formatter(_LOG_FORMAT)
             json_formatter.converter = time.gmtime
-
-            if log_dir:
-                log_path = Path(log_dir)
-                log_path.mkdir(parents=True, exist_ok=True)
-                file_path = log_path / 'mkpipe.log'
-                fh = logging.handlers.TimedRotatingFileHandler(
-                    file_path, when='midnight', backupCount=7
-                )
-                fh.setLevel(_DEFAULT_LOG_LEVEL)
-                fh.setFormatter(json_formatter)
-                self.logger.addHandler(fh)
 
             ch = logging.StreamHandler()
             ch.setLevel(_DEFAULT_LOG_LEVEL)
@@ -72,52 +95,16 @@ class Logger:
 
 
 def set_log_dir(log_dir: Optional[str]) -> None:
-    """Set global log directory and add file handler to all existing loggers."""
+    """Set global log directory. Installs a file handler on the root logger."""
     global _GLOBAL_LOG_DIR
     if log_dir is None or log_dir == _GLOBAL_LOG_DIR:
         return
     _GLOBAL_LOG_DIR = log_dir
-
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    file_path = log_path / 'mkpipe.log'
-
-    frmt = (
-        '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
-        '"log": %(message)s, "module": "%(name)s"}'
-    )
-    json_formatter = logging.Formatter(frmt)
-    json_formatter.converter = time.gmtime
-
-    fh = logging.handlers.TimedRotatingFileHandler(
-        file_path, when='midnight', backupCount=7
-    )
-    fh.setLevel(_DEFAULT_LOG_LEVEL)
-    fh.setFormatter(json_formatter)
-
-    # Add file handler to all existing mkpipe loggers
-    for name, existing_logger in logging.Logger.manager.loggerDict.items():
-        if isinstance(existing_logger, logging.Logger) and not any(
-            isinstance(h, logging.handlers.TimedRotatingFileHandler)
-            for h in existing_logger.handlers
-        ):
-            existing_logger.addHandler(fh)
-
-    # Store handler so new loggers also get it
-    _FILE_HANDLERS.append(fh)
-
-
-_FILE_HANDLERS: list = []
+    _install_file_handler(log_dir)
 
 
 def get_logger(name: str, log_dir: Optional[str] = None) -> Logger:
-    if log_dir is None:
-        log_dir = _GLOBAL_LOG_DIR
-    logger_instance = Logger(name, log_dir)
-
-    # Attach any previously created file handlers
-    for fh in _FILE_HANDLERS:
-        if fh not in logger_instance.logger.handlers:
-            logger_instance.logger.addHandler(fh)
-
-    return logger_instance
+    effective_dir = log_dir or _GLOBAL_LOG_DIR
+    if effective_dir:
+        _install_file_handler(effective_dir)
+    return Logger(name)
