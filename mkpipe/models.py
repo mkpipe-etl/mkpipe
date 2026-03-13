@@ -86,6 +86,7 @@ class BackendConfig(BaseModel):
 
 class SettingsConfig(BaseModel):
     timezone: str = 'UTC'
+    log_dir: Optional[str] = None
     backend: BackendConfig = Field(default_factory=BackendConfig)
     spark: SparkConfig = Field(default_factory=SparkConfig)
 

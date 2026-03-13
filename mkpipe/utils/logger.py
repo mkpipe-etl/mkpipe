@@ -9,6 +9,7 @@ from typing import Optional
 
 
 _LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+_GLOBAL_LOG_DIR: Optional[str] = os.getenv('MKPIPE_LOG_DIR')
 _LOG_LEVELS = {
     'debug': logging.DEBUG,
     'info': logging.INFO,
@@ -70,5 +71,12 @@ class Logger:
         self.logger.critical(self._format(message))
 
 
+def set_log_dir(log_dir: Optional[str]) -> None:
+    global _GLOBAL_LOG_DIR
+    _GLOBAL_LOG_DIR = log_dir
+
+
 def get_logger(name: str, log_dir: Optional[str] = None) -> Logger:
+    if log_dir is None:
+        log_dir = _GLOBAL_LOG_DIR
     return Logger(name, log_dir)

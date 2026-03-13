@@ -28,6 +28,7 @@ default_environment: prod
 prod:
   settings:
     timezone: UTC
+    log_dir: /path/to/logs
     backend:
       variant: sqlite
 

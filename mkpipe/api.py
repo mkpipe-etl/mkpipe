@@ -4,7 +4,7 @@ from typing import List, Optional, Sequence, Union
 from .config import load_config
 from .exceptions import ConfigError, TransformError
 from .models import ExtractResult, MkpipeConfig, TableConfig
-from .utils import get_logger
+from .utils import get_logger, set_log_dir
 
 logger = get_logger(__name__)
 
@@ -158,6 +158,7 @@ def run(
     spark=None,
 ):
     cfg = _get_config(config)
+    set_log_dir(cfg.settings.log_dir)
     spark = _ensure_spark(spark, cfg)
     backend = _create_backend(cfg)
 
@@ -229,6 +230,7 @@ def extract(
     spark=None,
 ) -> ExtractResult:
     cfg = _get_config(config)
+    set_log_dir(cfg.settings.log_dir)
     spark = _ensure_spark(spark, cfg)
 
     from .plugins.registry import get_extractor
@@ -263,6 +265,7 @@ def load(
     spark=None,
 ) -> None:
     cfg = _get_config(config)
+    set_log_dir(cfg.settings.log_dir)
     spark = _ensure_spark(spark, cfg)
 
     from .plugins.registry import get_loader
