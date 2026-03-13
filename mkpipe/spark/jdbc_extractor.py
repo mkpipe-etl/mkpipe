@@ -61,7 +61,7 @@ class JdbcExtractor(BaseExtractor):
             return table.custom_query
         if table.custom_query_file:
             base = root_dir or os.getcwd()
-            path = os.path.abspath(os.path.join(base, 'sql', table.custom_query_file))
+            path = os.path.abspath(os.path.join(base, table.custom_query_file))
             with open(path, 'r') as f:
                 return f.read()
         return None

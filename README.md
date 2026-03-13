@@ -224,6 +224,7 @@ staging:                     # you can define multiple environments
 ```yaml
 settings:
   timezone: UTC              # Spark session timezone (default: UTC)
+  log_dir: ./logs            # Log file directory (optional, logs to console if not set)
 
   spark:
     master: "local[*]"       # Spark master URL (default: local[*])
@@ -344,7 +345,7 @@ pipelines:
 | `write_partitions` | `None` | Number of write partitions (coalesce before writing) |
 | `dedup_columns` | `None` | Columns for `mkpipe_id` hash generation (xxhash64) |
 | `custom_query` | `None` | Custom SQL query with `{query_filter}` placeholder |
-| `custom_query_file` | `None` | Path to `.sql` file (relative to `sql/` directory) |
+| `custom_query_file` | `None` | Path to `.sql` file (relative to config directory) |
 | `transform` | `None` | Transform function reference: `path/to/file.py::function` |
 | `pass_on_error` | `false` | Continue pipeline on this table's failure |
 
