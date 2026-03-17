@@ -1,7 +1,13 @@
+import logging
+import random
+import time
+
 import psutil
 from typing import Optional
 
 from ..models import SparkConfig
+
+logger = logging.getLogger(__name__)
 
 
 def _get_container_memory_limit():
@@ -26,6 +32,53 @@ def _default_memory():
     return driver, executor
 
 
+def _create_with_retry(
+    conf,
+    max_attempts: int = 3,
+    base_delay: float = 5.0,
+):
+    """Create a SparkSession with retry and jittered backoff.
+
+    When multiple mkpipe processes start simultaneously (e.g. via Dagster
+    multiprocess executor), JVM startup causes heavy CPU contention.
+    Some JVMs fail to send their gateway port in time, raising
+    ``JAVA_GATEWAY_EXITED``.  Retrying with random delay staggers the
+    JVM startups and resolves the issue.
+    """
+    from pyspark.sql import SparkSession
+
+    last_error = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            session = SparkSession.builder.config(conf=conf).getOrCreate()
+            if attempt > 1:
+                logger.info(
+                    'SparkSession created on attempt %d/%d',
+                    attempt,
+                    max_attempts,
+                )
+            return session
+        except Exception as exc:
+            last_error = exc
+            if attempt >= max_attempts:
+                break
+            # Jittered backoff: base_delay * attempt + random 0-3s
+            delay = base_delay * attempt + random.uniform(0, 3)
+            logger.warning(
+                'SparkSession creation failed (attempt %d/%d): %s. Retrying in %.1fs...',
+                attempt,
+                max_attempts,
+                exc,
+                delay,
+            )
+            time.sleep(delay)
+
+    raise RuntimeError(
+        f'Failed to create SparkSession after {max_attempts} attempts'
+    ) from last_error
+
+
 def create_spark_session(
     config: Optional[SparkConfig] = None,
     jars: str = '',
@@ -33,7 +86,6 @@ def create_spark_session(
     timezone: str = 'UTC',
     app_name: str = 'mkpipe',
 ):
-    from pyspark.sql import SparkSession
     from pyspark import SparkConf
 
     default_driver_mem, default_executor_mem = _default_memory()
@@ -50,9 +102,7 @@ def create_spark_session(
         extra_config = config.extra_config or {}
 
     driver_java_options = (
-        f'-Duser.timezone={timezone} '
-        '-XX:ErrorFile=/tmp/java_error%p.log '
-        '-XX:HeapDumpPath=/tmp '
+        f'-Duser.timezone={timezone} -XX:ErrorFile=/tmp/java_error%p.log -XX:HeapDumpPath=/tmp '
     )
     executor_java_options = f'-Duser.timezone={timezone} '
 
@@ -82,4 +132,4 @@ def create_spark_session(
     for key, value in extra_config.items():
         conf.set(key, value)
 
-    return SparkSession.builder.config(conf=conf).getOrCreate()
+    return _create_with_retry(conf)
