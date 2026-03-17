@@ -235,7 +235,7 @@ settings:
       spark.dynamicAllocation.enabled: "true"
 
   backend:
-    variant: sqlite          # sqlite (default), postgresql, duckdb, clickhouse
+    variant: sqlite          # sqlite (default), postgres, duckdb, clickhouse
     host: localhost
     port: 5432
     database: mkpipe_db
@@ -278,7 +278,7 @@ Environment variables are referenced with `${VAR_NAME}` syntax and resolved at l
 
 | Parameter | Description |
 |---|---|
-| `variant` | **Required.** Plugin type: `postgresql`, `mysql`, `mongodb`, `file`, etc. |
+| `variant` | **Required.** Plugin type: `postgres`, `mysql`, `mongodb`, `file`, etc. |
 | `host` | Database host |
 | `port` | Database port |
 | `database` | Database name |

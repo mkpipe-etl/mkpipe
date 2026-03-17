@@ -168,7 +168,7 @@ parquet, avro, json, csv, xml, orc, iceberg, delta
 ```
 BaseExtractor (ABC)
     ├── JdbcExtractor (JDBC common — _jdbc_options() hook)
-    │       ├── PostgresExtractor (variant='postgresql')
+    │       ├── PostgresExtractor (variant='postgres')
     │       ├── MysqlExtractor (variant='mysql')
     │       ├── SnowflakeExtractor (variant='snowflake') — RSA key via _jdbc_options()
     │       ├── ... (all JDBC databases)

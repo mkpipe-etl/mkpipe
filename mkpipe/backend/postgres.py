@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from .base import BackendBase, retry
 
 
-class PostgresBackend(BackendBase, variant='postgresql'):
+class PostgresBackend(BackendBase, variant='postgres'):
     def __init__(self, config: Dict[str, Any]):
         self.connection_params = config
         super().__init__(config)
