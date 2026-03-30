@@ -11,6 +11,7 @@ class PostgresBackend(BackendBase, variant='postgres'):
 
     def _connect(self):
         import psycopg2
+
         return psycopg2.connect(
             database=self.connection_params.get('database'),
             user=self.connection_params.get('user'),
@@ -20,26 +21,33 @@ class PostgresBackend(BackendBase, variant='postgres'):
         )
 
     def init_table(self) -> None:
+        # Use advisory lock to prevent concurrent CREATE TABLE race condition.
+        # PostgreSQL's CREATE TABLE IF NOT EXISTS can raise UniqueViolation
+        # on pg_type when multiple processes execute it simultaneously.
         with self._connect() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS mkpipe_manifest (
-                        pipeline_name VARCHAR(255),
-                        table_name VARCHAR(255),
-                        last_point VARCHAR(50),
-                        type VARCHAR(50),
-                        replication_method VARCHAR(20)
-                            CHECK (replication_method IN ('incremental', 'full')),
-                        status VARCHAR(20)
-                            CHECK (status IN (
-                                'completed', 'failed', 'extracting', 'loading'
-                            )),
-                        error_message TEXT,
-                        updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        PRIMARY KEY (pipeline_name, table_name)
-                    )
-                """)
-                conn.commit()
+                cursor.execute('SELECT pg_advisory_lock(hashtext(%s))', ('mkpipe_manifest',))
+                try:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS mkpipe_manifest (
+                            pipeline_name VARCHAR(255),
+                            table_name VARCHAR(255),
+                            last_point VARCHAR(50),
+                            type VARCHAR(50),
+                            replication_method VARCHAR(20)
+                                CHECK (replication_method IN ('incremental', 'full')),
+                            status VARCHAR(20)
+                                CHECK (status IN (
+                                    'completed', 'failed', 'extracting', 'loading'
+                                )),
+                            error_message TEXT,
+                            updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (pipeline_name, table_name)
+                        )
+                    """)
+                    conn.commit()
+                finally:
+                    cursor.execute('SELECT pg_advisory_unlock(hashtext(%s))', ('mkpipe_manifest',))
 
     @retry()
     def get_table_status(self, pipeline_name: str, table_name: str) -> Optional[str]:
@@ -93,8 +101,7 @@ class PostgresBackend(BackendBase, variant='postgres'):
         with self._connect() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    'SELECT 1 FROM mkpipe_manifest '
-                    'WHERE pipeline_name = %s AND table_name = %s',
+                    'SELECT 1 FROM mkpipe_manifest WHERE pipeline_name = %s AND table_name = %s',
                     (pipeline_name, table_name),
                 )
                 exists = cursor.fetchone()
@@ -110,20 +117,27 @@ class PostgresBackend(BackendBase, variant='postgres'):
                         update_fields.append('type = %s')
                         update_values.append(value_type)
 
-                    update_fields.extend([
-                        'status = %s',
-                        'replication_method = %s',
-                        'error_message = %s',
-                        'updated_time = CURRENT_TIMESTAMP',
-                    ])
-                    update_values.extend([
-                        status, replication_method, error_message,
-                        pipeline_name, table_name,
-                    ])
+                    update_fields.extend(
+                        [
+                            'status = %s',
+                            'replication_method = %s',
+                            'error_message = %s',
+                            'updated_time = CURRENT_TIMESTAMP',
+                        ]
+                    )
+                    update_values.extend(
+                        [
+                            status,
+                            replication_method,
+                            error_message,
+                            pipeline_name,
+                            table_name,
+                        ]
+                    )
 
                     sql = (
-                        f"UPDATE mkpipe_manifest SET {', '.join(update_fields)} "
-                        f"WHERE pipeline_name = %s AND table_name = %s"
+                        f'UPDATE mkpipe_manifest SET {", ".join(update_fields)} '
+                        f'WHERE pipeline_name = %s AND table_name = %s'
                     )
                     cursor.execute(sql, tuple(update_values))
                 else:
@@ -133,8 +147,13 @@ class PostgresBackend(BackendBase, variant='postgres'):
                         'replication_method, error_message, updated_time) '
                         'VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)',
                         (
-                            pipeline_name, table_name, value, value_type,
-                            status, replication_method, error_message,
+                            pipeline_name,
+                            table_name,
+                            value,
+                            value_type,
+                            status,
+                            replication_method,
+                            error_message,
                         ),
                     )
                 conn.commit()
