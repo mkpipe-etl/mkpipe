@@ -92,9 +92,7 @@ def collect_jars() -> Tuple[str, str]:
                     if pkg_list:
                         for pkg in pkg_list:
                             artifact_id = pkg.split(':')[1] if ':' in pkg else ''
-                            already_local = any(
-                                artifact_id in name for name in local_jar_names
-                            )
+                            already_local = any(artifact_id in name for name in local_jar_names)
                             if not already_local:
                                 maven_packages.add(pkg)
                 except Exception:
@@ -135,7 +133,12 @@ def _discover_plugin_jar_info(group_list: List[str]) -> Dict[str, List[str]]:
 
 
 def download_jars() -> None:
-    """Download all Maven JARs for installed plugins into their jars/ directories.
+    """Download Maven JARs for each plugin into its own jars/ directory.
+
+    Each plugin's dependencies are resolved independently so that
+    transitive JARs from one plugin do not leak into another's
+    classpath (which can cause ``ArrayStoreException`` and similar
+    class-loading conflicts).
 
     Use this for offline/air-gapped environments (e.g. Docker build).
     After running, plugins will use the local JARs instead of Maven resolution.
@@ -148,45 +151,43 @@ def download_jars() -> None:
         print('No plugins with JAR_PACKAGES found.')
         return
 
-    all_packages = set()
-    for pkgs in plugin_info.values():
-        all_packages.update(pkgs)
+    total_packages = sum(len(pkgs) for pkgs in plugin_info.values())
+    print(f'Found {total_packages} Maven package(s) across {len(plugin_info)} plugin(s).')
 
-    print(f'Found {len(all_packages)} Maven package(s) across {len(plugin_info)} plugin(s).')
+    for jars_dir, packages in plugin_info.items():
+        dest = Path(jars_dir)
+        dest.mkdir(parents=True, exist_ok=True)
+        plugin_name = dest.parent.name
+        pkg_str = ','.join(sorted(packages))
 
-    ivy2_dir = tempfile.mkdtemp(prefix='mkpipe_ivy2_')
-    ivy2_jars = Path(ivy2_dir) / 'jars'
+        print(f'\n  [{plugin_name}] Resolving: {pkg_str}')
 
-    try:
-        print(f'Downloading JARs via Spark (ivy cache: {ivy2_dir})...')
+        ivy2_dir = tempfile.mkdtemp(prefix=f'mkpipe_ivy2_{plugin_name}_')
+        ivy2_jars = Path(ivy2_dir) / 'jars'
 
-        conf = SparkConf()
-        conf.setAppName('mkpipe-install-jars')
-        conf.setMaster('local[1]')
-        conf.set('spark.jars.packages', ','.join(sorted(all_packages)))
-        conf.set('spark.jars.ivy', ivy2_dir)
-        conf.set('spark.ui.enabled', 'false')
+        try:
+            conf = SparkConf()
+            conf.setAppName(f'mkpipe-install-jars-{plugin_name}')
+            conf.setMaster('local[1]')
+            conf.set('spark.jars.packages', pkg_str)
+            conf.set('spark.jars.ivy', ivy2_dir)
+            conf.set('spark.ui.enabled', 'false')
 
-        spark = SparkSession.builder.config(conf=conf).getOrCreate()
-        spark.stop()
+            spark = SparkSession.builder.config(conf=conf).getOrCreate()
+            spark.stop()
 
-        if not ivy2_jars.exists():
-            print(f'ERROR: No JARs downloaded to {ivy2_jars}')
-            return
+            if not ivy2_jars.exists():
+                print(f'  [{plugin_name}] ERROR: No JARs downloaded to {ivy2_jars}')
+                continue
 
-        downloaded = list(ivy2_jars.glob('*.jar'))
-        print(f'Downloaded {len(downloaded)} JAR file(s).')
-
-        for jars_dir in plugin_info:
-            dest = Path(jars_dir)
-            dest.mkdir(parents=True, exist_ok=True)
+            downloaded = list(ivy2_jars.glob('*.jar'))
             copied = 0
             for jar in downloaded:
                 shutil.copy2(str(jar), str(dest / jar.name))
                 copied += 1
-            print(f'  -> {dest}: {copied} JAR(s) copied')
+            print(f'  [{plugin_name}] -> {dest}: {copied} JAR(s) copied')
 
-        print('Done. Plugins will use local JARs at runtime.')
+        finally:
+            shutil.rmtree(ivy2_dir, ignore_errors=True)
 
-    finally:
-        shutil.rmtree(ivy2_dir, ignore_errors=True)
+    print('\nDone. Plugins will use local JARs at runtime.')
