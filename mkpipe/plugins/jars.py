@@ -135,16 +135,17 @@ def _discover_plugin_jar_info(group_list: List[str]) -> Dict[str, List[str]]:
 def download_jars() -> None:
     """Download Maven JARs for each plugin into its own jars/ directory.
 
-    Each plugin's dependencies are resolved independently so that
-    transitive JARs from one plugin do not leak into another's
-    classpath (which can cause ``ArrayStoreException`` and similar
-    class-loading conflicts).
+    Each plugin's dependencies are resolved in a **separate subprocess**
+    so that Spark/Ivy state from one resolution does not interfere with
+    another.  This prevents classpath contamination (e.g.
+    ``ArrayStoreException``) that occurs when all plugins' transitive
+    JARs are mixed together.
 
     Use this for offline/air-gapped environments (e.g. Docker build).
     After running, plugins will use the local JARs instead of Maven resolution.
     """
-    from pyspark import SparkConf
-    from pyspark.sql import SparkSession
+    import subprocess
+    import sys
 
     plugin_info = _discover_plugin_jar_info(_ENTRY_POINT_GROUPS)
     if not plugin_info:
@@ -156,38 +157,79 @@ def download_jars() -> None:
 
     for jars_dir, packages in plugin_info.items():
         dest = Path(jars_dir)
-        dest.mkdir(parents=True, exist_ok=True)
         plugin_name = dest.parent.name
         pkg_str = ','.join(sorted(packages))
 
         print(f'\n  [{plugin_name}] Resolving: {pkg_str}')
 
-        ivy2_dir = tempfile.mkdtemp(prefix=f'mkpipe_ivy2_{plugin_name}_')
-        ivy2_jars = Path(ivy2_dir) / 'jars'
+        # Run each plugin's download in a separate process so that
+        # Spark/JVM state is completely isolated between plugins.
+        result = subprocess.run(
+            [
+                sys.executable,
+                '-c',
+                _DOWNLOAD_SUBPROCESS_SCRIPT,
+                pkg_str,
+                str(dest),
+                plugin_name,
+            ],
+            capture_output=True,
+            text=True,
+        )
 
-        try:
-            conf = SparkConf()
-            conf.setAppName(f'mkpipe-install-jars-{plugin_name}')
-            conf.setMaster('local[1]')
-            conf.set('spark.jars.packages', pkg_str)
-            conf.set('spark.jars.ivy', ivy2_dir)
-            conf.set('spark.ui.enabled', 'false')
-
-            spark = SparkSession.builder.config(conf=conf).getOrCreate()
-            spark.stop()
-
-            if not ivy2_jars.exists():
-                print(f'  [{plugin_name}] ERROR: No JARs downloaded to {ivy2_jars}')
-                continue
-
-            downloaded = list(ivy2_jars.glob('*.jar'))
-            copied = 0
-            for jar in downloaded:
-                shutil.copy2(str(jar), str(dest / jar.name))
-                copied += 1
-            print(f'  [{plugin_name}] -> {dest}: {copied} JAR(s) copied')
-
-        finally:
-            shutil.rmtree(ivy2_dir, ignore_errors=True)
+        # Forward subprocess output
+        if result.stdout:
+            print(result.stdout, end='')
+        if result.returncode != 0:
+            print(f'  [{plugin_name}] ERROR (exit {result.returncode}):')
+            if result.stderr:
+                # Print only the last few lines to avoid Spark log noise
+                lines = result.stderr.strip().splitlines()
+                for line in lines[-10:]:
+                    print(f'    {line}')
 
     print('\nDone. Plugins will use local JARs at runtime.')
+
+
+# Script executed in a subprocess by download_jars().
+# argv: [packages_csv, dest_dir, plugin_name]
+_DOWNLOAD_SUBPROCESS_SCRIPT = """
+import shutil, sys, tempfile
+from pathlib import Path
+
+pkg_str = sys.argv[1]
+dest = Path(sys.argv[2])
+plugin_name = sys.argv[3]
+
+dest.mkdir(parents=True, exist_ok=True)
+
+from pyspark import SparkConf
+from pyspark.sql import SparkSession
+
+ivy2_dir = tempfile.mkdtemp(prefix=f'mkpipe_ivy2_{plugin_name}_')
+ivy2_jars = Path(ivy2_dir) / 'jars'
+
+try:
+    conf = SparkConf()
+    conf.setAppName(f'mkpipe-install-jars-{plugin_name}')
+    conf.setMaster('local[1]')
+    conf.set('spark.jars.packages', pkg_str)
+    conf.set('spark.jars.ivy', ivy2_dir)
+    conf.set('spark.ui.enabled', 'false')
+
+    spark = SparkSession.builder.config(conf=conf).getOrCreate()
+    spark.stop()
+
+    if not ivy2_jars.exists():
+        print(f'  [{plugin_name}] ERROR: No JARs downloaded to {ivy2_jars}')
+        sys.exit(1)
+
+    downloaded = list(ivy2_jars.glob('*.jar'))
+    copied = 0
+    for jar in downloaded:
+        shutil.copy2(str(jar), str(dest / jar.name))
+        copied += 1
+    print(f'  [{plugin_name}] -> {dest}: {copied} JAR(s) copied')
+finally:
+    shutil.rmtree(ivy2_dir, ignore_errors=True)
+"""
