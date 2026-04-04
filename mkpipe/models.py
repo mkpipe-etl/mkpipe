@@ -2,12 +2,19 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ReplicationMethod(str, Enum):
     FULL = 'full'
     INCREMENTAL = 'incremental'
+
+
+class WriteStrategy(str, Enum):
+    APPEND = 'append'
+    REPLACE = 'replace'
+    UPSERT = 'upsert'
+    MERGE = 'merge'
 
 
 class TableConfig(BaseModel):
@@ -38,6 +45,17 @@ class TableConfig(BaseModel):
     delta_z_order_by: Optional[List[str]] = None
     delta_properties: Dict[str, str] = Field(default_factory=dict)
     delta_schema_evolution: str = 'merge'
+    write_strategy: Optional[WriteStrategy] = None
+    write_key: Optional[List[str]] = None
+
+    @model_validator(mode='after')
+    def _validate_write_strategy(self) -> 'TableConfig':
+        if self.write_strategy in (WriteStrategy.UPSERT, WriteStrategy.MERGE):
+            if not self.write_key:
+                raise ValueError(
+                    f"write_strategy '{self.write_strategy.value}' requires write_key"
+                )
+        return self
 
 
 class ConnectionConfig(BaseModel):

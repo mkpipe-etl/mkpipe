@@ -8,6 +8,8 @@ from .exceptions import (
     PluginNotFoundError,
     BackendError,
 )
+from .models import WriteStrategy
+from .strategy import resolve_write_strategy
 
 __all__ = (
     'run',
@@ -20,4 +22,6 @@ __all__ = (
     'TransformError',
     'PluginNotFoundError',
     'BackendError',
+    'WriteStrategy',
+    'resolve_write_strategy',
 )

@@ -62,7 +62,8 @@ prod:
           replication_method: incremental
           iterate_column: updated_at
           iterate_column_type: datetime
-          dedup_columns: [id, updated_at]
+          write_strategy: upsert
+          write_key: [id]
 
         - name: public.orders
           target_name: stg_orders
@@ -322,6 +323,8 @@ pipelines:
         batchsize: 10000
         write_partitions: 4
         dedup_columns: [id, updated_at]
+        write_strategy: upsert
+        write_key: [id]
         custom_query: "(SELECT id, name, updated_at FROM users {query_filter}) q"
         transform: transforms/clean_users.py::transform
         pass_on_error: false
@@ -347,7 +350,70 @@ pipelines:
 | `custom_query` | `None` | Custom SQL query with `{query_filter}` placeholder |
 | `custom_query_file` | `None` | Path to `.sql` file (relative to config directory) |
 | `transform` | `None` | Transform function reference: `path/to/file.py::function` |
+| `write_strategy` | `None` | Write strategy: `append`, `replace`, `upsert`, `merge` (see below) |
+| `write_key` | `None` | Key columns for `upsert`/`merge` (required when strategy is upsert or merge) |
 | `pass_on_error` | `false` | Continue pipeline on this table's failure |
+
+---
+
+## Write Strategy
+
+`write_strategy` controls how data is written to the destination. If not set, it is inferred automatically: `overwrite` → `replace`, `append` → `append`.
+
+| Strategy | Behavior |
+|---|---|
+| `append` | Insert new rows. No deduplication. |
+| `replace` | Drop/overwrite all existing data, then insert. |
+| `upsert` | Insert new rows, update existing rows by `write_key`. Uses `MERGE`/`ON CONFLICT` for SQL databases. |
+| `merge` | Full MERGE with matched update + not-matched insert (JDBC loaders only, same as upsert for most targets). |
+
+### Usage
+
+```yaml
+tables:
+  # Upsert: update existing rows by primary key, insert new ones
+  - name: public.users
+    target_name: stg_users
+    replication_method: incremental
+    iterate_column: updated_at
+    write_strategy: upsert
+    write_key: [id]
+
+  # Replace: full overwrite every run
+  - name: public.orders
+    target_name: stg_orders
+    replication_method: full
+    write_strategy: replace
+
+  # Append (default for incremental): just insert
+  - name: public.events
+    target_name: stg_events
+    replication_method: incremental
+    iterate_column: created_at
+    write_strategy: append
+```
+
+### Supported Strategies per Loader
+
+| Loader | append | replace | upsert | merge |
+|---|---|---|---|---|
+| PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, Redshift, SQLite, TimescaleDB | Y | Y | Y | Y |
+| Snowflake | Y | Y | Y | Y |
+| BigQuery | Y | Y | Y | Y |
+| MongoDB | Y | Y | Y | — |
+| ClickHouse | Y | Y | Y | — |
+| Elasticsearch | Y | Y | Y | — |
+| DynamoDB | Y | Y | Y | — |
+| Cassandra | Y | Y | Y | — |
+| InfluxDB | Y | Y | Y | — |
+| Redis | — | Y | Y | — |
+| File (Parquet/CSV/Iceberg/Delta) | Y | Y | — | — |
+
+### Validation Rules
+
+- `write_strategy: upsert` or `merge` **requires** `write_key` — raises `ConfigError` if missing.
+- `write_key` is ignored when strategy is `append` or `replace`.
+- If `write_strategy` is not set, the strategy is inferred from the extractor's write mode.
 
 ---
 
