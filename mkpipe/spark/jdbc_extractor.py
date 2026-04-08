@@ -91,10 +91,14 @@ class JdbcExtractor(BaseExtractor):
         iterate_col_normalized = self._normalize_partitions_column(iterate_column)
 
         if last_point:
+            if iterate_column_type == 'int':
+                last_point_expr = last_point
+            else:
+                last_point_expr = f"'{last_point}'"
             bounds_query = (
                 f"(SELECT min({iterate_col_normalized}) AS min_val, "
                 f"max({iterate_col_normalized}) AS max_val "
-                f"FROM {name} WHERE {iterate_col_normalized} >= '{last_point}') q"
+                f"FROM {name} WHERE {iterate_col_normalized} >= {last_point_expr}) q"
             )
             write_mode = 'append'
         else:
