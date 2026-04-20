@@ -14,12 +14,12 @@ def _make_loader(dialect: str = 'ansi') -> JdbcLoader:
     return loader
 
 
-COLUMNS = ['id', 'name', 'email', 'etl_time', 'mkpipe_id']
+COLUMNS = ['id', 'name', 'email', '_ingested_at', 'mkpipe_id']
 WRITE_KEY = ['id']
-UPDATE_COLS = ['name', 'email', 'etl_time', 'mkpipe_id']
+UPDATE_COLS = ['name', 'email', '_ingested_at', 'mkpipe_id']
 
 MULTI_KEY = ['tenant_id', 'user_id']
-MULTI_UPDATE = ['name', 'email', 'etl_time']
+MULTI_UPDATE = ['name', 'email', '_ingested_at']
 
 
 class TestBuildUpsertSql:

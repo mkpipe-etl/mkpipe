@@ -4,6 +4,7 @@ default_environment: prod
 prod:
   settings:
     timezone: UTC
+    # ingested_at_column: _ingested_at  # Column name for ingestion timestamp (default: _ingested_at)
     backend:
       variant: sqlite
       database: mkpipe_manifest.db

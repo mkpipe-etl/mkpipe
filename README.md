@@ -226,6 +226,7 @@ staging:                     # you can define multiple environments
 settings:
   timezone: UTC              # Spark session timezone (default: UTC)
   log_dir: ./logs            # Log file directory (optional, logs to console if not set)
+  ingested_at_column: _ingested_at  # Column name for ingestion timestamp (default: _ingested_at)
 
   spark:
     master: "local[*]"       # Spark master URL (default: local[*])
@@ -425,7 +426,7 @@ mkpipe uses an **append-only** strategy for incremental replication:
 2. **Load**: appends to the target table (never overwrites or deletes)
 3. **Dedup**: if `dedup_columns` is set, a `mkpipe_id` (xxhash64 hash) is generated for downstream deduplication
 
-An `etl_time` timestamp is always added to every row.
+An ingestion timestamp column is always added to every row. The column name defaults to `_ingested_at` and can be customized via `settings.ingested_at_column`.
 
 ```yaml
 - name: public.users
@@ -476,7 +477,7 @@ Downstream dedup query example:
 ```sql
 SELECT * FROM (
   SELECT *,
-    ROW_NUMBER() OVER (PARTITION BY mkpipe_id ORDER BY etl_time DESC) AS rn
+    ROW_NUMBER() OVER (PARTITION BY mkpipe_id ORDER BY _ingested_at DESC) AS rn
   FROM stg_users
 ) WHERE rn = 1
 ```

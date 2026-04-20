@@ -190,6 +190,7 @@ def run(
 
         extractor = extractor_cls(connection=source_conn)
         loader = loader_cls(connection=dest_conn)
+        loader.ingested_at_column = cfg.settings.ingested_at_column
 
         tables = pipe.tables
         if table:
@@ -282,6 +283,7 @@ def load(
             if tbl.name == table or tbl.target_name == table:
                 loader_cls = get_loader(dest_conn.variant)
                 loader = loader_cls(connection=dest_conn)
+                loader.ingested_at_column = cfg.settings.ingested_at_column
                 data = ExtractResult(df=df, write_mode=write_mode)
                 loader.load(tbl, data, spark)
                 return
