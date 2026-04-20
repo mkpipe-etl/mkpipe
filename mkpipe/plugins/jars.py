@@ -1,7 +1,5 @@
 import importlib
 import importlib.metadata
-import shutil
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Tuple
 

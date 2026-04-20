@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 
 from mkpipe.models import ConnectionConfig
 from mkpipe.spark.jdbc_loader import JdbcLoader
