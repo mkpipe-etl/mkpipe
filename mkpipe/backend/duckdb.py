@@ -11,6 +11,7 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
 
     def _connect(self):
         import duckdb
+
         return duckdb.connect(self.db_path)
 
     def init_table(self) -> None:
@@ -64,8 +65,7 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
         conn = self._connect()
         try:
             result = conn.execute(
-                'SELECT last_point FROM mkpipe_manifest '
-                'WHERE pipeline_name = ? AND table_name = ?',
+                'SELECT last_point FROM mkpipe_manifest WHERE pipeline_name = ? AND table_name = ?',
                 [pipeline_name, table_name],
             ).fetchone()
             return result[0] if result else None
@@ -86,8 +86,7 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
         conn = self._connect()
         try:
             result = conn.execute(
-                'SELECT 1 FROM mkpipe_manifest '
-                'WHERE pipeline_name = ? AND table_name = ?',
+                'SELECT 1 FROM mkpipe_manifest WHERE pipeline_name = ? AND table_name = ?',
                 [pipeline_name, table_name],
             ).fetchone()
 
@@ -102,20 +101,27 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
                     update_fields.append('type = ?')
                     update_values.append(value_type)
 
-                update_fields.extend([
-                    'status = ?',
-                    'replication_method = ?',
-                    'error_message = ?',
-                    'updated_time = CURRENT_TIMESTAMP',
-                ])
-                update_values.extend([
-                    status, replication_method, error_message,
-                    pipeline_name, table_name,
-                ])
+                update_fields.extend(
+                    [
+                        'status = ?',
+                        'replication_method = ?',
+                        'error_message = ?',
+                        'updated_time = CURRENT_TIMESTAMP',
+                    ]
+                )
+                update_values.extend(
+                    [
+                        status,
+                        replication_method,
+                        error_message,
+                        pipeline_name,
+                        table_name,
+                    ]
+                )
 
                 sql = (
-                    f"UPDATE mkpipe_manifest SET {', '.join(update_fields)} "
-                    f"WHERE pipeline_name = ? AND table_name = ?"
+                    f'UPDATE mkpipe_manifest SET {", ".join(update_fields)} '
+                    f'WHERE pipeline_name = ? AND table_name = ?'
                 )
                 conn.execute(sql, update_values)
             else:
@@ -125,8 +131,13 @@ class DuckDBBackend(BackendBase, variant='duckdb'):
                     'replication_method, error_message, updated_time) '
                     'VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
                     [
-                        pipeline_name, table_name, value, value_type,
-                        status, replication_method, error_message,
+                        pipeline_name,
+                        table_name,
+                        value,
+                        value_type,
+                        status,
+                        replication_method,
+                        error_message,
                     ],
                 )
         finally:

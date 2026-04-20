@@ -40,9 +40,7 @@ def _install_file_handler(log_dir: str) -> None:
     json_formatter = logging.Formatter(_LOG_FORMAT)
     json_formatter.converter = time.gmtime
 
-    fh = logging.handlers.TimedRotatingFileHandler(
-        file_path, when='midnight', backupCount=7
-    )
+    fh = logging.handlers.TimedRotatingFileHandler(file_path, when='midnight', backupCount=7)
     fh.setLevel(_DEFAULT_LOG_LEVEL)
     fh.setFormatter(json_formatter)
 

@@ -10,17 +10,20 @@ def cli():
 
 @cli.command(help='Run mkpipe pipelines from a configuration file.')
 @click.option(
-    '--config', '-c',
+    '--config',
+    '-c',
     default=None,
     help='Path to the configuration file. Defaults to mkpipe_project.yaml in current dir.',
 )
 @click.option(
-    '--pipeline', '-p',
+    '--pipeline',
+    '-p',
     default=None,
     help='Run only the specified pipeline.',
 )
 @click.option(
-    '--table', '-t',
+    '--table',
+    '-t',
     default=None,
     help='Run only the specified table.',
 )
@@ -44,7 +47,10 @@ def run(config, pipeline, table, tags):
     click.echo('Done.')
 
 
-@cli.command('install-jars', help='Download Maven JARs for all installed plugins. Use for offline/Docker builds.')
+@cli.command(
+    'install-jars',
+    help='Download Maven JARs for all installed plugins. Use for offline/Docker builds.',
+)
 def install_jars():
     from .plugins.jars import download_jars
 

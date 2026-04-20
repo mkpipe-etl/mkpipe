@@ -20,9 +20,7 @@ def load_transform_fn(ref: str, base_dir: str = None) -> Callable:
     file_path = os.path.abspath(file_path)
 
     if not os.path.exists(file_path):
-        raise ConfigError(
-            f"Transform file not found: '{file_path}'"
-        )
+        raise ConfigError(f"Transform file not found: '{file_path}'")
 
     spec = importlib.util.spec_from_file_location('_mkpipe_transform', file_path)
     module = importlib.util.module_from_spec(spec)
@@ -30,13 +28,9 @@ def load_transform_fn(ref: str, base_dir: str = None) -> Callable:
 
     fn = getattr(module, fn_name, None)
     if fn is None:
-        raise ConfigError(
-            f"Function '{fn_name}' not found in '{file_path}'"
-        )
+        raise ConfigError(f"Function '{fn_name}' not found in '{file_path}'")
 
     if not callable(fn):
-        raise ConfigError(
-            f"'{fn_name}' in '{file_path}' is not callable"
-        )
+        raise ConfigError(f"'{fn_name}' in '{file_path}' is not callable")
 
     return fn

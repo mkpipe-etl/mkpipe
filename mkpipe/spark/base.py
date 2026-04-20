@@ -18,11 +18,12 @@ class BaseExtractor(ABC):
         extractor_class = cls._registry.get(variant)
         if not extractor_class:
             from ..plugins.registry import discover_extractor
+
             extractor_class = discover_extractor(variant)
         if not extractor_class:
             raise PluginNotFoundError(
                 f"No extractor found for variant: '{variant}'. "
-                f"Available: {list(cls._registry.keys())}"
+                f'Available: {list(cls._registry.keys())}'
             )
         return extractor_class(**kwargs)
 
@@ -45,11 +46,11 @@ class BaseLoader(ABC):
         loader_class = cls._registry.get(variant)
         if not loader_class:
             from ..plugins.registry import discover_loader
+
             loader_class = discover_loader(variant)
         if not loader_class:
             raise PluginNotFoundError(
-                f"No loader found for variant: '{variant}'. "
-                f"Available: {list(cls._registry.keys())}"
+                f"No loader found for variant: '{variant}'. Available: {list(cls._registry.keys())}"
             )
         return loader_class(**kwargs)
 

@@ -19,7 +19,9 @@ def retry(max_attempts=5, delay=1):
                     if attempts >= max_attempts:
                         raise
                     time.sleep(delay)
+
         return wrapper
+
     return decorator
 
 
@@ -61,7 +63,7 @@ class BackendBase(ABC):
         if not backend_class:
             raise BackendError(
                 f"No backend found for variant: '{variant}'. "
-                f"Available: {list(cls._registry.keys())}"
+                f'Available: {list(cls._registry.keys())}'
             )
         return backend_class(config)
 

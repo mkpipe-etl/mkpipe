@@ -64,11 +64,13 @@ def _run_table(
     try:
         status = backend.get_table_status(pipeline_name, target_name)
         if status in ('extracting', 'loading'):
-            logger.info({
-                'table': target_name,
-                'status': 'skipped',
-                'reason': 'already in progress',
-            })
+            logger.info(
+                {
+                    'table': target_name,
+                    'status': 'skipped',
+                    'reason': 'already in progress',
+                }
+            )
             return
 
         # --- EXTRACT ---
@@ -89,9 +91,7 @@ def _run_table(
             try:
                 data.df = transform_fn(data.df)
             except Exception as e:
-                raise TransformError(
-                    f"Transform failed for '{target_name}': {e}"
-                ) from e
+                raise TransformError(f"Transform failed for '{target_name}': {e}") from e
 
         # --- LOAD ---
         if data.df is not None:
@@ -115,20 +115,24 @@ def _run_table(
             error_message='',
         )
 
-        logger.info({
-            'table': target_name,
-            'pipeline': pipeline_name,
-            'status': 'completed',
-        })
+        logger.info(
+            {
+                'table': target_name,
+                'pipeline': pipeline_name,
+                'status': 'completed',
+            }
+        )
 
     except Exception as e:
         error_msg = str(e)
-        logger.error({
-            'table': target_name,
-            'pipeline': pipeline_name,
-            'status': 'failed',
-            'error': error_msg,
-        })
+        logger.error(
+            {
+                'table': target_name,
+                'pipeline': pipeline_name,
+                'status': 'failed',
+                'error': error_msg,
+            }
+        )
 
         try:
             backend.manifest_table_update(
@@ -139,12 +143,14 @@ def _run_table(
                 error_message=error_msg,
             )
         except Exception as be:
-            logger.error({
-                'table': target_name,
-                'pipeline': pipeline_name,
-                'status': 'backend_update_failed',
-                'error': str(be),
-            })
+            logger.error(
+                {
+                    'table': target_name,
+                    'pipeline': pipeline_name,
+                    'status': 'backend_update_failed',
+                    'error': str(be),
+                }
+            )
 
         if not pass_on_error:
             raise
@@ -167,8 +173,7 @@ def run(
         pipelines = [p for p in pipelines if p.name == pipeline]
         if not pipelines:
             raise ConfigError(
-                f"Pipeline '{pipeline}' not found. "
-                f"Available: {[p.name for p in cfg.pipelines]}"
+                f"Pipeline '{pipeline}' not found. Available: {[p.name for p in cfg.pipelines]}"
             )
 
     from .plugins.registry import get_extractor, get_loader
@@ -176,9 +181,7 @@ def run(
     for pipe in pipelines:
         source_conn = cfg.connections.get(pipe.source)
         if not source_conn:
-            raise ConfigError(
-                f"Connection '{pipe.source}' not found for pipeline '{pipe.name}'"
-            )
+            raise ConfigError(f"Connection '{pipe.source}' not found for pipeline '{pipe.name}'")
         dest_conn = cfg.connections.get(pipe.destination)
         if not dest_conn:
             raise ConfigError(
@@ -194,16 +197,14 @@ def run(
 
         tables = pipe.tables
         if table:
-            tables = [
-                t for t in tables
-                if t.name == table or t.target_name == table
-            ]
+            tables = [t for t in tables if t.name == table or t.target_name == table]
         tables = _filter_tables_by_tags(tables, tags)
 
         for tbl in tables:
             transform_fn = None
             if tbl.transform:
                 from .transform.loader import load_transform_fn
+
                 config_dir = None
                 if isinstance(config, (str, Path)):
                     config_dir = str(Path(config).parent)

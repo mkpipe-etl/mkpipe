@@ -24,6 +24,7 @@ _ENV_VAR_PATTERN = re.compile(r'\$\{([^}]+)\}')
 
 def _resolve_env_vars(value: Any) -> Any:
     if isinstance(value, str):
+
         def _replacer(match):
             var_name = match.group(1)
             env_val = os.environ.get(var_name)
@@ -45,7 +46,7 @@ def _resolve_env_vars(value: Any) -> Any:
 def load_config(path: Union[str, Path]) -> MkpipeConfig:
     path = Path(path)
     if not path.exists():
-        raise ConfigError(f"Config file not found: {path}")
+        raise ConfigError(f'Config file not found: {path}')
 
     with path.open('r') as f:
         raw = yaml.safe_load(f) or {}
@@ -55,7 +56,7 @@ def load_config(path: Union[str, Path]) -> MkpipeConfig:
     if env_data is None:
         raise ConfigError(
             f"Environment '{environment}' not found in config file. "
-            f"Available: {[k for k in raw.keys() if k != 'default_environment']}"
+            f'Available: {[k for k in raw.keys() if k != "default_environment"]}'
         )
 
     env_data = _resolve_env_vars(env_data)

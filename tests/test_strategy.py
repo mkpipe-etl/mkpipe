@@ -18,6 +18,7 @@ def _make_result(write_mode: str = 'overwrite') -> ExtractResult:
 
 # --- resolve_write_strategy tests ---
 
+
 class TestResolveWriteStrategy:
     def test_explicit_append(self):
         table = _make_table(write_strategy='append')
@@ -58,13 +59,14 @@ class TestResolveWriteStrategy:
 
 # --- TableConfig validation tests ---
 
+
 class TestTableConfigValidation:
     def test_upsert_without_write_key_raises(self):
-        with pytest.raises(ValueError, match="requires write_key"):
+        with pytest.raises(ValueError, match='requires write_key'):
             _make_table(write_strategy='upsert')
 
     def test_merge_without_write_key_raises(self):
-        with pytest.raises(ValueError, match="requires write_key"):
+        with pytest.raises(ValueError, match='requires write_key'):
             _make_table(write_strategy='merge')
 
     def test_upsert_with_write_key_ok(self):
@@ -97,6 +99,7 @@ class TestTableConfigValidation:
 
 
 # --- WriteStrategy enum tests ---
+
 
 class TestWriteStrategyEnum:
     def test_values(self):

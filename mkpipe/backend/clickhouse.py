@@ -11,6 +11,7 @@ class ClickhouseBackend(BackendBase, variant='clickhouse'):
 
     def _connect(self):
         import clickhouse_connect
+
         return clickhouse_connect.get_client(
             host=self.connection_params.get('host', 'localhost'),
             port=int(self.connection_params.get('port', 8123)),
@@ -98,12 +99,26 @@ class ClickhouseBackend(BackendBase, variant='clickhouse'):
 
         client.insert(
             'mkpipe_manifest',
-            data=[[
-                pipeline_name, table_name, final_value, final_type,
-                replication_method, status, error_message, datetime.now(),
-            ]],
+            data=[
+                [
+                    pipeline_name,
+                    table_name,
+                    final_value,
+                    final_type,
+                    replication_method,
+                    status,
+                    error_message,
+                    datetime.now(),
+                ]
+            ],
             column_names=[
-                'pipeline_name', 'table_name', 'last_point', 'type',
-                'replication_method', 'status', 'error_message', 'updated_time',
+                'pipeline_name',
+                'table_name',
+                'last_point',
+                'type',
+                'replication_method',
+                'status',
+                'error_message',
+                'updated_time',
             ],
         )

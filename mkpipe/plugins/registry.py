@@ -49,7 +49,7 @@ def get_extractor(variant: str) -> Type:
     if not cls:
         raise PluginNotFoundError(
             f"No extractor found for variant: '{variant}'. "
-            f"Install the appropriate plugin package, e.g. "
+            f'Install the appropriate plugin package, e.g. '
             f"'pip install mkpipe-extractor-{variant}'"
         )
     return cls
@@ -64,7 +64,7 @@ def get_loader(variant: str) -> Type:
     if not cls:
         raise PluginNotFoundError(
             f"No loader found for variant: '{variant}'. "
-            f"Install the appropriate plugin package, e.g. "
+            f'Install the appropriate plugin package, e.g. '
             f"'pip install mkpipe-loader-{variant}'"
         )
     return cls

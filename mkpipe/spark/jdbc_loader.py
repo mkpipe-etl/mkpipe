@@ -63,7 +63,9 @@ class JdbcLoader(BaseLoader):
         props = {'driver': self.driver_jdbc}
         props.update(self._jdbc_options())
         conn = spark._jvm.java.sql.DriverManager.getConnection(
-            jdbc_url, self.username, quote_plus(str(self.connection.password or '')),
+            jdbc_url,
+            self.username,
+            quote_plus(str(self.connection.password or '')),
         )
         try:
             stmt = conn.createStatement()
@@ -77,7 +79,11 @@ class JdbcLoader(BaseLoader):
     # ── Dialect-specific MERGE / UPSERT SQL builders ──────────────────
 
     def _build_upsert_sql(
-        self, temp_table: str, target_table: str, write_key: List[str], columns: List[str],
+        self,
+        temp_table: str,
+        target_table: str,
+        write_key: List[str],
+        columns: List[str],
     ) -> str:
         non_key_cols = [c for c in columns if c not in write_key]
         return self._build_merge_sql(temp_table, target_table, write_key, columns, non_key_cols)
@@ -142,13 +148,21 @@ class JdbcLoader(BaseLoader):
     # ── Upsert / Merge via temp table ─────────────────────────────────
 
     def _upsert(
-        self, df, target_name: str, write_key: List[str], batchsize: int, spark,
+        self,
+        df,
+        target_name: str,
+        write_key: List[str],
+        batchsize: int,
+        spark,
     ) -> None:
         temp_table = f'_mkpipe_tmp_{target_name}'
         try:
             self._write_df(df, 'overwrite', temp_table, batchsize)
             sql = self._build_upsert_sql(
-                temp_table, target_name, write_key, df.columns,
+                temp_table,
+                target_name,
+                write_key,
+                df.columns,
             )
             logger.debug({'upsert_sql': sql})
             self._execute_sql(sql, spark)
@@ -171,7 +185,11 @@ class JdbcLoader(BaseLoader):
         try:
             self._write_df(df, 'overwrite', temp_table, batchsize)
             sql = self._build_merge_sql(
-                temp_table, target_name, write_key, df.columns, non_key_cols,
+                temp_table,
+                target_name,
+                write_key,
+                df.columns,
+                non_key_cols,
             )
             logger.debug({'merge_sql': sql})
             self._execute_sql(sql, spark)
@@ -189,25 +207,34 @@ class JdbcLoader(BaseLoader):
         df = data.df
 
         if df is None:
-            logger.info({
-                'table': target_name,
-                'status': 'skipped',
-                'reason': 'no data to load',
-            })
+            logger.info(
+                {
+                    'table': target_name,
+                    'status': 'skipped',
+                    'reason': 'no data to load',
+                }
+            )
             return
 
-        df = add_etl_columns(df, datetime.now(), dedup_columns=table.dedup_columns, ingested_at_column=self.ingested_at_column)
+        df = add_etl_columns(
+            df,
+            datetime.now(),
+            dedup_columns=table.dedup_columns,
+            ingested_at_column=self.ingested_at_column,
+        )
 
         if table.write_partitions:
             df = df.coalesce(table.write_partitions)
 
         strategy = resolve_write_strategy(table, data)
 
-        logger.info({
-            'table': target_name,
-            'status': 'loading',
-            'write_strategy': strategy.value,
-        })
+        logger.info(
+            {
+                'table': target_name,
+                'status': 'loading',
+                'write_strategy': strategy.value,
+            }
+        )
 
         try:
             match strategy:
@@ -229,14 +256,16 @@ class JdbcLoader(BaseLoader):
                     self._merge(df, target_name, table.write_key, batchsize, spark)
                 case _:
                     raise ConfigError(
-                        f"JDBC loader does not support write_strategy: {strategy.value}"
+                        f'JDBC loader does not support write_strategy: {strategy.value}'
                     )
         except (ConfigError, LoadError):
             raise
         except Exception as e:
             raise LoadError(f"Failed to write '{target_name}': {e}") from e
 
-        logger.info({
-            'table': target_name,
-            'status': 'loaded',
-        })
+        logger.info(
+            {
+                'table': target_name,
+                'status': 'loaded',
+            }
+        )

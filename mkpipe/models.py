@@ -52,9 +52,7 @@ class TableConfig(BaseModel):
     def _validate_write_strategy(self) -> 'TableConfig':
         if self.write_strategy in (WriteStrategy.UPSERT, WriteStrategy.MERGE):
             if not self.write_key:
-                raise ValueError(
-                    f"write_strategy '{self.write_strategy.value}' requires write_key"
-                )
+                raise ValueError(f"write_strategy '{self.write_strategy.value}' requires write_key")
         return self
 
 

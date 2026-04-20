@@ -46,13 +46,9 @@ class SqliteBackend(BackendBase, variant='sqlite'):
             if updated_time:
                 if isinstance(updated_time, str):
                     try:
-                        updated_time = datetime.strptime(
-                            updated_time, '%Y-%m-%d %H:%M:%S'
-                        )
+                        updated_time = datetime.strptime(updated_time, '%Y-%m-%d %H:%M:%S')
                     except ValueError:
-                        updated_time = datetime.strptime(
-                            updated_time, '%Y-%m-%d %H:%M:%S.%f'
-                        )
+                        updated_time = datetime.strptime(updated_time, '%Y-%m-%d %H:%M:%S.%f')
 
                 if datetime.now() - updated_time > timedelta(days=1):
                     conn.execute(
@@ -69,8 +65,7 @@ class SqliteBackend(BackendBase, variant='sqlite'):
     def get_last_point(self, pipeline_name: str, table_name: str) -> Optional[str]:
         with self._connect() as conn:
             cursor = conn.execute(
-                'SELECT last_point FROM mkpipe_manifest '
-                'WHERE pipeline_name = ? AND table_name = ?',
+                'SELECT last_point FROM mkpipe_manifest WHERE pipeline_name = ? AND table_name = ?',
                 (pipeline_name, table_name),
             )
             result = cursor.fetchone()
@@ -89,8 +84,7 @@ class SqliteBackend(BackendBase, variant='sqlite'):
     ) -> None:
         with self._connect() as conn:
             cursor = conn.execute(
-                'SELECT 1 FROM mkpipe_manifest '
-                'WHERE pipeline_name = ? AND table_name = ?',
+                'SELECT 1 FROM mkpipe_manifest WHERE pipeline_name = ? AND table_name = ?',
                 (pipeline_name, table_name),
             )
             exists = cursor.fetchone()
@@ -106,20 +100,27 @@ class SqliteBackend(BackendBase, variant='sqlite'):
                     update_fields.append('type = ?')
                     update_values.append(value_type)
 
-                update_fields.extend([
-                    'status = ?',
-                    'replication_method = ?',
-                    'error_message = ?',
-                    'updated_time = CURRENT_TIMESTAMP',
-                ])
-                update_values.extend([
-                    status, replication_method, error_message,
-                    pipeline_name, table_name,
-                ])
+                update_fields.extend(
+                    [
+                        'status = ?',
+                        'replication_method = ?',
+                        'error_message = ?',
+                        'updated_time = CURRENT_TIMESTAMP',
+                    ]
+                )
+                update_values.extend(
+                    [
+                        status,
+                        replication_method,
+                        error_message,
+                        pipeline_name,
+                        table_name,
+                    ]
+                )
 
                 sql = (
-                    f"UPDATE mkpipe_manifest SET {', '.join(update_fields)} "
-                    f"WHERE pipeline_name = ? AND table_name = ?"
+                    f'UPDATE mkpipe_manifest SET {", ".join(update_fields)} '
+                    f'WHERE pipeline_name = ? AND table_name = ?'
                 )
                 conn.execute(sql, tuple(update_values))
             else:
@@ -129,8 +130,13 @@ class SqliteBackend(BackendBase, variant='sqlite'):
                     'replication_method, error_message, updated_time) '
                     'VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
                     (
-                        pipeline_name, table_name, value, value_type,
-                        status, replication_method, error_message,
+                        pipeline_name,
+                        table_name,
+                        value,
+                        value_type,
+                        status,
+                        replication_method,
+                        error_message,
                     ),
                 )
             conn.commit()
