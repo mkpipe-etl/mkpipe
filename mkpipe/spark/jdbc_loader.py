@@ -217,7 +217,8 @@ class JdbcLoader(BaseLoader):
             return
 
         df = add_etl_columns(
-            df, datetime.now(),
+            df,
+            datetime.now(),
             dedup_columns=table.dedup_columns,
             ingested_at_column=self.ingested_at_column,
             ingestion_id_column=self.ingestion_id_column,
