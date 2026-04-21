@@ -227,6 +227,7 @@ settings:
   timezone: UTC              # Spark session timezone (default: UTC)
   log_dir: ./logs            # Log file directory (optional, logs to console if not set)
   ingested_at_column: _ingested_at  # Column name for ingestion timestamp (default: _ingested_at)
+  ingestion_id_column: mkpipe_id   # Column name for dedup hash ID (default: mkpipe_id)
 
   spark:
     master: "local[*]"       # Spark master URL (default: local[*])
@@ -347,7 +348,7 @@ pipelines:
 | `fetchsize` | `100000` | JDBC fetch size (rows per network round trip) |
 | `batchsize` | `10000` | JDBC write batch size |
 | `write_partitions` | `None` | Number of write partitions (coalesce before writing) |
-| `dedup_columns` | `None` | Columns for `mkpipe_id` hash generation (xxhash64) |
+| `dedup_columns` | `None` | Columns for dedup hash generation (xxhash64). Column name configurable via `settings.ingestion_id_column` |
 | `custom_query` | `None` | Custom SQL query with `{query_filter}` placeholder |
 | `custom_query_file` | `None` | Path to `.sql` file (relative to config directory) |
 | `transform` | `None` | Transform function reference: `path/to/file.py::function` |

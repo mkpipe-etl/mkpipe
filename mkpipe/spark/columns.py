@@ -10,6 +10,7 @@ def add_etl_columns(
     etl_time: datetime,
     dedup_columns: Optional[List[str]] = None,
     ingested_at_column: str = '_ingested_at',
+    ingestion_id_column: str = 'mkpipe_id',
 ) -> DataFrame:
     if ingested_at_column in df.columns:
         df = df.drop(ingested_at_column)
@@ -17,6 +18,6 @@ def add_etl_columns(
 
     if dedup_columns:
         hash_cols = [F.coalesce(F.col(c).cast('string'), F.lit('')) for c in dedup_columns]
-        df = df.withColumn('mkpipe_id', F.xxhash64(*hash_cols))
+        df = df.withColumn(ingestion_id_column, F.xxhash64(*hash_cols))
 
     return df

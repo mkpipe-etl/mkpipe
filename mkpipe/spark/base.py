@@ -35,6 +35,7 @@ class BaseExtractor(ABC):
 class BaseLoader(ABC):
     _registry: Dict[str, Type['BaseLoader']] = {}
     ingested_at_column: str = '_ingested_at'
+    ingestion_id_column: str = 'mkpipe_id'
 
     def __init_subclass__(cls, variant: Optional[str] = None, **kwargs):
         super().__init_subclass__(**kwargs)
