@@ -470,6 +470,15 @@ An ingestion timestamp column is always added to every row. The column name defa
   dedup_columns: [id, updated_at]  # mkpipe_id = xxhash64(id, updated_at)
 ```
 
+### NULL Handling in iterate_column
+
+On **initial load** (no previous checkpoint), the extractor automatically includes rows where `iterate_column` evaluates to `NULL`. This prevents data loss when using expressions like `greatest(cdate, udate)` where both source columns can be `NULL`.
+
+- **Initial load**: `WHERE (col >= min AND col <= max) OR col IS NULL`
+- **Incremental load**: `WHERE col >= last_point AND col <= max` (NULL rows already captured)
+
+If **all** rows have a `NULL` iterate_column, the extractor falls back to a full extraction.
+
 ### Partition Column Type Behavior
 
 The `partitions_column_type` parameter controls how partition bounds are converted for Spark JDBC partitioning:

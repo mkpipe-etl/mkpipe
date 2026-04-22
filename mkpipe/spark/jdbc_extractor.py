@@ -146,15 +146,24 @@ class JdbcExtractor(BaseExtractor):
 
         # --- Step 2: Build filter clause using iterate_column ---
         if iterate_column_type == 'int':
-            filter_clause = (
-                f'WHERE {iterate_col_normalized} >= {min_iterate} '
+            range_cond = (
+                f'{iterate_col_normalized} >= {min_iterate} '
                 f'AND {iterate_col_normalized} <= {max_iterate}'
             )
         else:
-            filter_clause = (
-                f"WHERE {iterate_col_normalized} >= '{min_iterate}' "
+            range_cond = (
+                f"{iterate_col_normalized} >= '{min_iterate}' "
                 f"AND {iterate_col_normalized} <= '{max_iterate}'"
             )
+
+        # On initial load, include rows where iterate_column is NULL
+        # (e.g. greatest(cdate, udate) when both are NULL).
+        # These rows would otherwise be lost because NULL comparisons
+        # evaluate to NULL/false in SQL.
+        if not last_point:
+            filter_clause = f'WHERE ({range_cond}) OR {iterate_col_normalized} IS NULL'
+        else:
+            filter_clause = f'WHERE {range_cond}'
 
         if custom_query:
             updated_query = custom_query.replace('{query_filter}', f' {filter_clause} ')
