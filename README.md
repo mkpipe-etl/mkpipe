@@ -228,6 +228,7 @@ settings:
   log_dir: ./logs            # Log file directory (optional, logs to console if not set)
   ingested_at_column: _ingested_at  # Column name for ingestion timestamp (default: _ingested_at)
   ingestion_id_column: mkpipe_id   # Column name for dedup hash ID (default: mkpipe_id)
+  column_name_case: as_is          # Column name casing: lower, upper, as_is (default: as_is)
 
   spark:
     master: "local[*]"       # Spark master URL (default: local[*])
@@ -354,6 +355,7 @@ pipelines:
 | `transform` | `None` | Transform function reference: `path/to/file.py::function` |
 | `write_strategy` | `None` | Write strategy: `append`, `replace`, `upsert`, `merge` (see below) |
 | `write_key` | `None` | Key columns for `upsert`/`merge` (required when strategy is upsert or merge) |
+| `column_name_case` | `None` | Override column casing for this table: `lower`, `upper`, `as_is` (default: inherits from settings) |
 | `pass_on_error` | `false` | Continue pipeline on this table's failure |
 
 ---
@@ -416,6 +418,36 @@ tables:
 - `write_strategy: upsert` or `merge` **requires** `write_key` — raises `ConfigError` if missing.
 - `write_key` is ignored when strategy is `append` or `replace`.
 - If `write_strategy` is not set, the strategy is inferred from the extractor's write mode.
+
+---
+
+## Column Name Casing
+
+Some databases (Snowflake, Oracle) return uppercase column names by default. When writing to a case-sensitive target like PostgreSQL, this results in uppercase quoted identifiers that are inconvenient to query.
+
+Use `column_name_case` to normalize column names before writing:
+
+```yaml
+settings:
+  column_name_case: lower    # lower, upper, or as_is (default: as_is)
+```
+
+This can also be overridden per table:
+
+```yaml
+tables:
+  - name: SNOWFLAKE_SCHEMA.USERS
+    target_name: stg_users
+    column_name_case: lower   # override for this table only
+```
+
+| Value | Behavior |
+|-------|----------|
+| `as_is` | No transformation (default) |
+| `lower` | All column names converted to lowercase |
+| `upper` | All column names converted to uppercase |
+
+Table-level `column_name_case` takes priority over the settings-level default. If the table does not specify it, the settings value is used.
 
 ---
 

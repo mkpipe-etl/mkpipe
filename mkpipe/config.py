@@ -68,6 +68,7 @@ def load_config(path: Union[str, Path]) -> MkpipeConfig:
         log_dir=settings_raw.get('log_dir'),
         ingested_at_column=settings_raw.get('ingested_at_column', '_ingested_at'),
         ingestion_id_column=settings_raw.get('ingestion_id_column', 'mkpipe_id'),
+        column_name_case=settings_raw.get('column_name_case', 'as_is'),
         backend=BackendConfig(**settings_raw.get('backend', {})),
         spark=SparkConfig(**settings_raw.get('spark', {})),
     )

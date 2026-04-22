@@ -214,6 +214,9 @@ def run(
             effective_pass = tbl.pass_on_error or pipe.pass_on_error
             tbl_with_pass = tbl.model_copy(update={'pass_on_error': effective_pass})
 
+            # Resolve column_name_case: table-level override > settings default
+            loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
+
             _run_table(
                 extractor=extractor,
                 loader=loader,
@@ -287,6 +290,7 @@ def load(
                 loader = loader_cls(connection=dest_conn)
                 loader.ingested_at_column = cfg.settings.ingested_at_column
                 loader.ingestion_id_column = cfg.settings.ingestion_id_column
+                loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
                 data = ExtractResult(df=df, write_mode=write_mode)
                 loader.load(tbl, data, spark)
                 return

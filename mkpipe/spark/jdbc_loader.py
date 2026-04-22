@@ -4,7 +4,7 @@ from typing import Dict, List
 from urllib.parse import quote_plus
 
 from .base import BaseLoader
-from .columns import add_etl_columns
+from .columns import add_etl_columns, normalize_column_names
 from ..exceptions import ConfigError, LoadError
 from ..models import ConnectionConfig, ExtractResult, TableConfig, WriteStrategy
 from ..strategy import resolve_write_strategy
@@ -223,6 +223,7 @@ class JdbcLoader(BaseLoader):
             ingested_at_column=self.ingested_at_column,
             ingestion_id_column=self.ingestion_id_column,
         )
+        df = normalize_column_names(df, self.column_name_case)
 
         if table.write_partitions:
             df = df.coalesce(table.write_partitions)

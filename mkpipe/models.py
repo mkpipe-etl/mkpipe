@@ -47,6 +47,7 @@ class TableConfig(BaseModel):
     delta_schema_evolution: str = 'merge'
     write_strategy: Optional[WriteStrategy] = None
     write_key: Optional[List[str]] = None
+    column_name_case: Optional[str] = None
 
     @model_validator(mode='after')
     def _validate_write_strategy(self) -> 'TableConfig':
@@ -105,6 +106,7 @@ class SettingsConfig(BaseModel):
     log_dir: Optional[str] = None
     ingested_at_column: str = '_ingested_at'
     ingestion_id_column: str = 'mkpipe_id'
+    column_name_case: str = 'as_is'
     backend: BackendConfig = Field(default_factory=BackendConfig)
     spark: SparkConfig = Field(default_factory=SparkConfig)
 

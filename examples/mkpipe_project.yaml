@@ -6,6 +6,7 @@ prod:
     timezone: UTC
     # ingested_at_column: _ingested_at  # Column name for ingestion timestamp (default: _ingested_at)
     # ingestion_id_column: mkpipe_id   # Column name for dedup hash ID (default: mkpipe_id)
+    # column_name_case: as_is          # Column name casing: lower, upper, as_is (default: as_is)
     backend:
       variant: sqlite
       database: mkpipe_manifest.db
