@@ -147,6 +147,21 @@ class JdbcLoader(BaseLoader):
 
     # ── Upsert / Merge via temp table ─────────────────────────────────
 
+    def _table_exists(self, table_name: str, spark) -> bool:
+        """Check if a table exists in the target database."""
+        try:
+            jdbc_url = self.build_jdbc_url()
+            spark.read.format('jdbc').option(
+                'url', jdbc_url
+            ).option(
+                'dbtable', f'(SELECT 1 FROM {table_name} LIMIT 0) q'
+            ).option(
+                'driver', self.driver_jdbc
+            ).load()
+            return True
+        except Exception:
+            return False
+
     def _upsert(
         self,
         df,
@@ -155,6 +170,16 @@ class JdbcLoader(BaseLoader):
         batchsize: int,
         spark,
     ) -> None:
+        # If target table does not exist, create it with a direct write first
+        if not self._table_exists(target_name, spark):
+            logger.info({
+                'table': target_name,
+                'status': 'creating_table',
+                'reason': 'target table does not exist, falling back to direct write',
+            })
+            self._write_df(df, 'overwrite', target_name, batchsize)
+            return
+
         temp_table = f'_mkpipe_tmp_{target_name}'
         try:
             self._write_df(df, 'overwrite', temp_table, batchsize)
@@ -180,6 +205,16 @@ class JdbcLoader(BaseLoader):
         batchsize: int,
         spark,
     ) -> None:
+        # If target table does not exist, create it with a direct write first
+        if not self._table_exists(target_name, spark):
+            logger.info({
+                'table': target_name,
+                'status': 'creating_table',
+                'reason': 'target table does not exist, falling back to direct write',
+            })
+            self._write_df(df, 'overwrite', target_name, batchsize)
+            return
+
         temp_table = f'_mkpipe_tmp_{target_name}'
         non_key_cols = [c for c in df.columns if c not in write_key]
         try:
