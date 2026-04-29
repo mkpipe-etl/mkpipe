@@ -162,6 +162,72 @@ class JdbcLoader(BaseLoader):
         except Exception:
             return False
 
+    def _ensure_unique_constraint(
+        self, table_name: str, write_key: List[str], spark
+    ) -> None:
+        """Create a unique constraint on *write_key* columns if not already present.
+
+        Required by PostgreSQL ``ON CONFLICT`` and similar upsert dialects.
+        """
+        constraint_name = f'uq_mkpipe_{table_name}_{"_".join(write_key)}'
+        cols = ', '.join(f'"{c}"' for c in write_key)
+
+        dialect = self._dialect
+        if dialect in ('postgres', 'postgresql', 'redshift', 'timescaledb'):
+            sql = (
+                f'ALTER TABLE {table_name} '
+                f'ADD CONSTRAINT "{constraint_name}" UNIQUE ({cols})'
+            )
+        elif dialect in ('mysql', 'mariadb'):
+            sql = (
+                f'ALTER TABLE {table_name} '
+                f'ADD UNIQUE INDEX `{constraint_name}` ({cols})'
+            )
+        elif dialect == 'sqlserver':
+            sql = (
+                f'ALTER TABLE {table_name} '
+                f'ADD CONSTRAINT [{constraint_name}] UNIQUE ({cols})'
+            )
+        else:
+            # ANSI / Snowflake / Oracle fallback
+            sql = (
+                f'ALTER TABLE {table_name} '
+                f'ADD CONSTRAINT "{constraint_name}" UNIQUE ({cols})'
+            )
+
+        try:
+            self._execute_sql(sql, spark)
+            logger.info({
+                'table': table_name,
+                'status': 'unique_constraint_created',
+                'columns': write_key,
+            })
+        except Exception:
+            # Constraint may already exist or DB doesn't enforce it (e.g. Snowflake)
+            logger.debug({
+                'table': table_name,
+                'status': 'unique_constraint_skipped',
+                'columns': write_key,
+                'reason': 'constraint may already exist',
+            })
+
+    def _create_table_for_upsert(
+        self,
+        df,
+        target_name: str,
+        write_key: List[str],
+        batchsize: int,
+        spark,
+    ) -> None:
+        """Create target table with initial data and add unique constraint for write_key."""
+        logger.info({
+            'table': target_name,
+            'status': 'creating_table',
+            'reason': 'target table does not exist, falling back to direct write',
+        })
+        self._write_df(df, 'overwrite', target_name, batchsize)
+        self._ensure_unique_constraint(target_name, write_key, spark)
+
     def _upsert(
         self,
         df,
@@ -170,15 +236,12 @@ class JdbcLoader(BaseLoader):
         batchsize: int,
         spark,
     ) -> None:
-        # If target table does not exist, create it with a direct write first
         if not self._table_exists(target_name, spark):
-            logger.info({
-                'table': target_name,
-                'status': 'creating_table',
-                'reason': 'target table does not exist, falling back to direct write',
-            })
-            self._write_df(df, 'overwrite', target_name, batchsize)
+            self._create_table_for_upsert(df, target_name, write_key, batchsize, spark)
             return
+
+        # Ensure unique constraint exists (idempotent - skips if already present)
+        self._ensure_unique_constraint(target_name, write_key, spark)
 
         temp_table = f'_mkpipe_tmp_{target_name}'
         try:
@@ -205,15 +268,12 @@ class JdbcLoader(BaseLoader):
         batchsize: int,
         spark,
     ) -> None:
-        # If target table does not exist, create it with a direct write first
         if not self._table_exists(target_name, spark):
-            logger.info({
-                'table': target_name,
-                'status': 'creating_table',
-                'reason': 'target table does not exist, falling back to direct write',
-            })
-            self._write_df(df, 'overwrite', target_name, batchsize)
+            self._create_table_for_upsert(df, target_name, write_key, batchsize, spark)
             return
+
+        # Ensure unique constraint exists (idempotent - skips if already present)
+        self._ensure_unique_constraint(target_name, write_key, spark)
 
         temp_table = f'_mkpipe_tmp_{target_name}'
         non_key_cols = [c for c in df.columns if c not in write_key]
