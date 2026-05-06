@@ -216,6 +216,8 @@ def run(
 
             # Resolve column_name_case: table-level override > settings default
             loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
+            # Resolve if_exists: table-level override > settings default
+            loader.if_exists = tbl.if_exists or cfg.settings.if_exists
 
             _run_table(
                 extractor=extractor,
@@ -291,6 +293,7 @@ def load(
                 loader.ingested_at_column = cfg.settings.ingested_at_column
                 loader.ingestion_id_column = cfg.settings.ingestion_id_column
                 loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
+                loader.if_exists = tbl.if_exists or cfg.settings.if_exists
                 data = ExtractResult(df=df, write_mode=write_mode)
                 loader.load(tbl, data, spark)
                 return

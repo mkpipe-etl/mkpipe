@@ -330,6 +330,7 @@ class JdbcLoader(BaseLoader):
                 'table': target_name,
                 'status': 'loading',
                 'write_strategy': strategy.value,
+                'if_exists': self.if_exists,
             }
         )
 
@@ -338,7 +339,8 @@ class JdbcLoader(BaseLoader):
                 case WriteStrategy.APPEND:
                     self._write_df(df, 'append', target_name, batchsize)
                 case WriteStrategy.REPLACE:
-                    self._write_df(df, 'overwrite', target_name, batchsize)
+                    mode = 'append' if self.if_exists == 'append' else 'overwrite'
+                    self._write_df(df, mode, target_name, batchsize)
                 case WriteStrategy.UPSERT:
                     if not table.write_key:
                         raise ConfigError(

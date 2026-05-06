@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from mkpipe.models import ExtractResult, TableConfig, WriteStrategy
+from mkpipe.models import ExtractResult, SettingsConfig, TableConfig, WriteStrategy
 from mkpipe.strategy import resolve_write_strategy
 
 
@@ -121,3 +121,56 @@ class TestWriteStrategyEnum:
     def test_invalid_raises(self):
         with pytest.raises(ValueError):
             WriteStrategy('invalid')
+
+
+# --- if_exists parameter tests ---
+
+
+class TestIfExistsTableConfig:
+    def test_default_is_none(self):
+        table = _make_table()
+        assert table.if_exists is None
+
+    def test_replace_value(self):
+        table = _make_table(if_exists='replace')
+        assert table.if_exists == 'replace'
+
+    def test_append_value(self):
+        table = _make_table(if_exists='append')
+        assert table.if_exists == 'append'
+
+    def test_if_exists_with_write_strategy(self):
+        table = _make_table(write_strategy='replace', if_exists='append')
+        assert table.write_strategy == WriteStrategy.REPLACE
+        assert table.if_exists == 'append'
+
+    def test_if_exists_independent_of_write_key(self):
+        table = _make_table(
+            write_strategy='upsert', write_key=['id'], if_exists='append',
+        )
+        assert table.if_exists == 'append'
+        assert table.write_key == ['id']
+
+
+class TestIfExistsSettingsConfig:
+    def test_default_is_replace(self):
+        settings = SettingsConfig()
+        assert settings.if_exists == 'replace'
+
+    def test_override_to_append(self):
+        settings = SettingsConfig(if_exists='append')
+        assert settings.if_exists == 'append'
+
+    def test_table_overrides_settings(self):
+        """Table-level if_exists takes precedence over settings default."""
+        settings = SettingsConfig(if_exists='replace')
+        table = _make_table(if_exists='append')
+        effective = table.if_exists or settings.if_exists
+        assert effective == 'append'
+
+    def test_table_none_falls_back_to_settings(self):
+        """When table if_exists is None, settings default is used."""
+        settings = SettingsConfig(if_exists='append')
+        table = _make_table()
+        effective = table.if_exists or settings.if_exists
+        assert effective == 'append'

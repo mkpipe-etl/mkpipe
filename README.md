@@ -229,6 +229,7 @@ settings:
   ingested_at_column: _ingested_at  # Column name for ingestion timestamp (default: _ingested_at)
   ingestion_id_column: mkpipe_id   # Column name for dedup hash ID (default: mkpipe_id)
   column_name_case: as_is          # Column name casing: lower, upper, as_is (default: as_is)
+  if_exists: replace               # Target table behavior on full load: replace (default) or append
 
   spark:
     master: "local[*]"       # Spark master URL (default: local[*])
@@ -355,6 +356,7 @@ pipelines:
 | `transform` | `None` | Transform function reference: `path/to/file.py::function` |
 | `write_strategy` | `None` | Write strategy: `append`, `replace`, `upsert`, `merge` (see below) |
 | `write_key` | `None` | Key columns for `upsert`/`merge` (required when strategy is upsert or merge) |
+| `if_exists` | `None` | Target table behavior on full load: `replace` (drop+create) or `append` (insert into existing). Inherits from settings if not set |
 | `column_name_case` | `None` | Override column casing for this table: `lower`, `upper`, `as_is` (default: inherits from settings) |
 | `pass_on_error` | `false` | Continue pipeline on this table's failure |
 
@@ -418,6 +420,43 @@ tables:
 - `write_strategy: upsert` or `merge` **requires** `write_key` — raises `ConfigError` if missing.
 - `write_key` is ignored when strategy is `append` or `replace`.
 - If `write_strategy` is not set, the strategy is inferred from the extractor's write mode.
+
+---
+
+## If Exists (Target Table Preservation)
+
+`if_exists` controls whether the target table is dropped and recreated or preserved on full load (`replace` strategy).
+
+| Value | Behavior |
+|---|---|
+| `replace` | Drop existing target table and recreate it (default) |
+| `append` | Preserve existing target table structure, insert data without dropping |
+
+This is useful when you want to keep the target table schema (e.g. indexes, constraints, grants) intact across runs.
+
+### Global Setting
+
+```yaml
+settings:
+  if_exists: replace    # default: drop and recreate target tables
+```
+
+### Per-Table Override
+
+```yaml
+tables:
+  - name: public.users
+    target_name: stg_users
+    if_exists: append     # preserve this table, just insert
+
+  - name: public.orders
+    target_name: stg_orders
+    # inherits settings.if_exists (replace)
+```
+
+Table-level `if_exists` takes priority over the settings-level default. If the table does not specify it, the settings value is used.
+
+> **Note:** `if_exists` only affects the `replace` write strategy (full load). It has no effect on `append`, `upsert`, or `merge` strategies, which never drop the target table.
 
 ---
 

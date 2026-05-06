@@ -126,6 +126,7 @@ class JdbcExtractor(BaseExtractor):
 
         if not row or row[0] is None:
             if not last_point:
+                logger.info({'table': table.target_name, 'status': 'empty_source_initial_load'})
                 return self._extract_full(table, spark)
             logger.info({'table': table.target_name, 'status': 'no_new_data'})
             return ExtractResult(df=None, write_mode=write_mode)
