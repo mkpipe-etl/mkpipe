@@ -356,7 +356,7 @@ pipelines:
 | `transform` | `None` | Transform function reference: `path/to/file.py::function` |
 | `write_strategy` | `None` | Write strategy: `append`, `replace`, `upsert`, `merge` (see below) |
 | `write_key` | `None` | Key columns for `upsert`/`merge` (required when strategy is upsert or merge) |
-| `if_exists` | `None` | Target table behavior on full load: `replace` (drop+create) or `append` (insert into existing). Inherits from settings if not set |
+| `if_exists` | `None` | Target table behavior on full load: `replace` (drop+create, default) or `append` (preserve table, truncate+insert). Inherits from settings if not set |
 | `column_name_case` | `None` | Override column casing for this table: `lower`, `upper`, `as_is` (default: inherits from settings) |
 | `pass_on_error` | `false` | Continue pipeline on this table's failure |
 
@@ -369,7 +369,7 @@ pipelines:
 | Strategy | Behavior |
 |---|---|
 | `append` | Insert new rows. No deduplication. |
-| `replace` | Drop/overwrite all existing data, then insert. |
+| `replace` | Clear and reload all data. With `if_exists: replace` (default): drop and recreate. With `if_exists: append`: truncate existing data, then insert (preserves schema/indexes). |
 | `upsert` | Insert new rows, update existing rows by `write_key`. Uses `MERGE`/`ON CONFLICT` for SQL databases. |
 | `merge` | Full MERGE with matched update + not-matched insert (JDBC loaders only, same as upsert for most targets). |
 
@@ -430,9 +430,19 @@ tables:
 | Value | Behavior |
 |---|---|
 | `replace` | Drop existing target table and recreate it (default) |
-| `append` | Preserve existing target table structure, insert data without dropping |
+| `append` | Preserve existing target table structure (schema, indexes, constraints, grants) |
 
-This is useful when you want to keep the target table schema (e.g. indexes, constraints, grants) intact across runs.
+When `if_exists: append` is combined with `write_strategy: replace`, the loader **truncates** (clears all data from) the existing table before inserting — the table structure is preserved but data is refreshed. This is useful when you want to keep indexes, constraints, and grants intact across runs.
+
+### Behavior Matrix
+
+| `if_exists` | `write_strategy` | Result |
+|---|---|---|
+| `replace` (default) | `replace` | DROP + CREATE + INSERT |
+| `append` | `replace` | TRUNCATE + INSERT (schema preserved) |
+| `append` | `upsert` | ON CONFLICT DO UPDATE (table + constraints preserved) |
+| `append` | `append` | Direct INSERT |
+| `replace` | `upsert` | CREATE if needed + MERGE/ON CONFLICT |
 
 ### Global Setting
 
@@ -447,7 +457,7 @@ settings:
 tables:
   - name: public.users
     target_name: stg_users
-    if_exists: append     # preserve this table, just insert
+    if_exists: append     # preserve table structure, truncate + insert on replace
 
   - name: public.orders
     target_name: stg_orders
