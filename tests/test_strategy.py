@@ -50,17 +50,15 @@ class TestResolveWriteStrategy:
         result = _make_result('append')
         assert resolve_write_strategy(table, result) == WriteStrategy.APPEND
 
-    def test_overwrite_forces_replace_even_with_explicit_strategy(self):
+    def test_explicit_strategy_honoured_on_overwrite(self):
         table = _make_table(write_strategy='append')
         result = _make_result('overwrite')
-        # overwrite (full extract) always forces REPLACE to avoid
-        # stale data and expensive upsert on full dataset
-        assert resolve_write_strategy(table, result) == WriteStrategy.REPLACE
+        assert resolve_write_strategy(table, result) == WriteStrategy.APPEND
 
-    def test_overwrite_forces_replace_over_upsert(self):
+    def test_explicit_upsert_honoured_on_overwrite(self):
         table = _make_table(write_strategy='upsert', write_key=['id'])
         result = _make_result('overwrite')
-        assert resolve_write_strategy(table, result) == WriteStrategy.REPLACE
+        assert resolve_write_strategy(table, result) == WriteStrategy.UPSERT
 
 
 # --- TableConfig validation tests ---

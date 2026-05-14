@@ -339,8 +339,12 @@ class JdbcLoader(BaseLoader):
                 case WriteStrategy.APPEND:
                     self._write_df(df, 'append', target_name, batchsize)
                 case WriteStrategy.REPLACE:
-                    mode = 'append' if self.if_exists == 'append' else 'overwrite'
-                    self._write_df(df, mode, target_name, batchsize)
+                    if self.if_exists == 'append':
+                        if self._table_exists(target_name, spark):
+                            self._execute_sql(f'TRUNCATE TABLE {target_name}', spark)
+                        self._write_df(df, 'append', target_name, batchsize)
+                    else:
+                        self._write_df(df, 'overwrite', target_name, batchsize)
                 case WriteStrategy.UPSERT:
                     if not table.write_key:
                         raise ConfigError(

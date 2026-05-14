@@ -85,6 +85,13 @@ def _run_table(
         last_point = backend.get_last_point(pipeline_name, target_name)
         data = extractor.extract(table, spark, last_point=last_point)
 
+        if data.df is not None:
+            logger.debug({
+                'table': target_name,
+                'status': 'schema_after_extract',
+                'schema': {f.name: f.dataType.simpleString() for f in data.df.schema.fields},
+            })
+
         # --- TRANSFORM ---
         if data.df is not None and transform_fn is not None:
             logger.info({'table': target_name, 'pipeline': pipeline_name, 'status': 'transforming'})
