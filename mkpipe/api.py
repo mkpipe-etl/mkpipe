@@ -175,70 +175,66 @@ def run(
     spark = _ensure_spark(spark, cfg)
     backend = _create_backend(cfg)
 
-    try:
-        pipelines = cfg.pipelines
-        if pipeline:
-            pipelines = [p for p in pipelines if p.name == pipeline]
-            if not pipelines:
-                raise ConfigError(
-                    f"Pipeline '{pipeline}' not found. Available: {[p.name for p in cfg.pipelines]}"
-                )
+    pipelines = cfg.pipelines
+    if pipeline:
+        pipelines = [p for p in pipelines if p.name == pipeline]
+        if not pipelines:
+            raise ConfigError(
+                f"Pipeline '{pipeline}' not found. Available: {[p.name for p in cfg.pipelines]}"
+            )
 
-        from .plugins.registry import get_extractor, get_loader
+    from .plugins.registry import get_extractor, get_loader
 
-        for pipe in pipelines:
-            source_conn = cfg.connections.get(pipe.source)
-            if not source_conn:
-                raise ConfigError(f"Connection '{pipe.source}' not found for pipeline '{pipe.name}'")
-            dest_conn = cfg.connections.get(pipe.destination)
-            if not dest_conn:
-                raise ConfigError(
-                    f"Connection '{pipe.destination}' not found for pipeline '{pipe.name}'"
-                )
+    for pipe in pipelines:
+        source_conn = cfg.connections.get(pipe.source)
+        if not source_conn:
+            raise ConfigError(f"Connection '{pipe.source}' not found for pipeline '{pipe.name}'")
+        dest_conn = cfg.connections.get(pipe.destination)
+        if not dest_conn:
+            raise ConfigError(
+                f"Connection '{pipe.destination}' not found for pipeline '{pipe.name}'"
+            )
 
-            extractor_cls = get_extractor(source_conn.variant)
-            loader_cls = get_loader(dest_conn.variant)
+        extractor_cls = get_extractor(source_conn.variant)
+        loader_cls = get_loader(dest_conn.variant)
 
-            extractor = extractor_cls(connection=source_conn)
-            loader = loader_cls(connection=dest_conn)
-            loader.ingested_at_column = cfg.settings.ingested_at_column
-            loader.ingestion_id_column = cfg.settings.ingestion_id_column
+        extractor = extractor_cls(connection=source_conn)
+        loader = loader_cls(connection=dest_conn)
+        loader.ingested_at_column = cfg.settings.ingested_at_column
+        loader.ingestion_id_column = cfg.settings.ingestion_id_column
 
-            tables = pipe.tables
-            if table:
-                tables = [t for t in tables if t.name == table or t.target_name == table]
-            tables = _filter_tables_by_tags(tables, tags)
+        tables = pipe.tables
+        if table:
+            tables = [t for t in tables if t.name == table or t.target_name == table]
+        tables = _filter_tables_by_tags(tables, tags)
 
-            for tbl in tables:
-                transform_fn = None
-                if tbl.transform:
-                    from .transform.loader import load_transform_fn
+        for tbl in tables:
+            transform_fn = None
+            if tbl.transform:
+                from .transform.loader import load_transform_fn
 
-                    config_dir = None
-                    if isinstance(config, (str, Path)):
-                        config_dir = str(Path(config).parent)
-                    transform_fn = load_transform_fn(tbl.transform, base_dir=config_dir)
+                config_dir = None
+                if isinstance(config, (str, Path)):
+                    config_dir = str(Path(config).parent)
+                transform_fn = load_transform_fn(tbl.transform, base_dir=config_dir)
 
-                effective_pass = tbl.pass_on_error or pipe.pass_on_error
-                tbl_with_pass = tbl.model_copy(update={'pass_on_error': effective_pass})
+            effective_pass = tbl.pass_on_error or pipe.pass_on_error
+            tbl_with_pass = tbl.model_copy(update={'pass_on_error': effective_pass})
 
-                # Resolve column_name_case: table-level override > settings default
-                loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
-                # Resolve if_exists: table-level override > settings default
-                loader.if_exists = tbl.if_exists or cfg.settings.if_exists
+            # Resolve column_name_case: table-level override > settings default
+            loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
+            # Resolve if_exists: table-level override > settings default
+            loader.if_exists = tbl.if_exists or cfg.settings.if_exists
 
-                _run_table(
-                    extractor=extractor,
-                    loader=loader,
-                    table=tbl_with_pass,
-                    backend=backend,
-                    spark=spark,
-                    pipeline_name=pipe.name,
-                    transform_fn=transform_fn,
-                )
-    finally:
-        from .spark.session import cleanup_spark_tmp
-        cleanup_spark_tmp(spark)
+            _run_table(
+                extractor=extractor,
+                loader=loader,
+                table=tbl_with_pass,
+                backend=backend,
+                spark=spark,
+                pipeline_name=pipe.name,
+                transform_fn=transform_fn,
+            )
 
 
 def extract(
@@ -252,31 +248,27 @@ def extract(
     set_log_dir(cfg.settings.log_dir)
     spark = _ensure_spark(spark, cfg)
 
-    try:
-        from .plugins.registry import get_extractor
+    from .plugins.registry import get_extractor
 
-        backend = _create_backend(cfg)
+    backend = _create_backend(cfg)
 
-        for pipe in cfg.pipelines:
-            if pipeline and pipe.name != pipeline:
-                continue
+    for pipe in cfg.pipelines:
+        if pipeline and pipe.name != pipeline:
+            continue
 
-            source_conn = cfg.connections.get(pipe.source)
-            if not source_conn:
-                continue
+        source_conn = cfg.connections.get(pipe.source)
+        if not source_conn:
+            continue
 
-            filtered = _filter_tables_by_tags(pipe.tables, tags)
-            for tbl in filtered:
-                if tbl.name == table or tbl.target_name == table:
-                    extractor_cls = get_extractor(source_conn.variant)
-                    extractor = extractor_cls(connection=source_conn)
-                    last_point = backend.get_last_point(pipe.name, tbl.target_name)
-                    return extractor.extract(tbl, spark, last_point=last_point)
+        filtered = _filter_tables_by_tags(pipe.tables, tags)
+        for tbl in filtered:
+            if tbl.name == table or tbl.target_name == table:
+                extractor_cls = get_extractor(source_conn.variant)
+                extractor = extractor_cls(connection=source_conn)
+                last_point = backend.get_last_point(pipe.name, tbl.target_name)
+                return extractor.extract(tbl, spark, last_point=last_point)
 
-        raise ConfigError(f"Table '{table}' not found in any pipeline")
-    finally:
-        from .spark.session import cleanup_spark_tmp
-        cleanup_spark_tmp(spark)
+    raise ConfigError(f"Table '{table}' not found in any pipeline")
 
 
 def load(
@@ -291,30 +283,26 @@ def load(
     set_log_dir(cfg.settings.log_dir)
     spark = _ensure_spark(spark, cfg)
 
-    try:
-        from .plugins.registry import get_loader
+    from .plugins.registry import get_loader
 
-        for pipe in cfg.pipelines:
-            if pipeline and pipe.name != pipeline:
-                continue
+    for pipe in cfg.pipelines:
+        if pipeline and pipe.name != pipeline:
+            continue
 
-            dest_conn = cfg.connections.get(pipe.destination)
-            if not dest_conn:
-                continue
+        dest_conn = cfg.connections.get(pipe.destination)
+        if not dest_conn:
+            continue
 
-            for tbl in pipe.tables:
-                if tbl.name == table or tbl.target_name == table:
-                    loader_cls = get_loader(dest_conn.variant)
-                    loader = loader_cls(connection=dest_conn)
-                    loader.ingested_at_column = cfg.settings.ingested_at_column
-                    loader.ingestion_id_column = cfg.settings.ingestion_id_column
-                    loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
-                    loader.if_exists = tbl.if_exists or cfg.settings.if_exists
-                    data = ExtractResult(df=df, write_mode=write_mode)
-                    loader.load(tbl, data, spark)
-                    return
+        for tbl in pipe.tables:
+            if tbl.name == table or tbl.target_name == table:
+                loader_cls = get_loader(dest_conn.variant)
+                loader = loader_cls(connection=dest_conn)
+                loader.ingested_at_column = cfg.settings.ingested_at_column
+                loader.ingestion_id_column = cfg.settings.ingestion_id_column
+                loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
+                loader.if_exists = tbl.if_exists or cfg.settings.if_exists
+                data = ExtractResult(df=df, write_mode=write_mode)
+                loader.load(tbl, data, spark)
+                return
 
-        raise ConfigError(f"Table '{table}' not found in any pipeline")
-    finally:
-        from .spark.session import cleanup_spark_tmp
-        cleanup_spark_tmp(spark)
+    raise ConfigError(f"Table '{table}' not found in any pipeline")

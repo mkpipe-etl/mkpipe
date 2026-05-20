@@ -1,8 +1,6 @@
 import logging
 import random
-import shutil
 import time
-from pathlib import Path
 from typing import Optional
 
 import psutil
@@ -10,8 +8,6 @@ import psutil
 from ..models import SparkConfig
 
 logger = logging.getLogger(__name__)
-
-SPARK_TMP_DIR = Path('/tmp/spark-tmp')
 
 
 def _get_container_memory_limit():
@@ -124,7 +120,6 @@ def create_spark_session(
     if packages:
         conf.set('spark.jars.packages', packages)
 
-    conf.set('spark.local.dir', str(SPARK_TMP_DIR))
     conf.set('spark.network.timeout', '600s')
     conf.set('spark.sql.parquet.datetimeRebaseModeInRead', 'CORRECTED')
     conf.set('spark.sql.parquet.datetimeRebaseModeInWrite', 'CORRECTED')
@@ -137,35 +132,4 @@ def create_spark_session(
     for key, value in extra_config.items():
         conf.set(key, value)
 
-    SPARK_TMP_DIR.mkdir(parents=True, exist_ok=True)
     return _create_with_retry(conf)
-
-
-def cleanup_spark_tmp(spark=None, stale_minutes: int = 1440) -> None:
-    """Remove stale/orphan Spark temp artifacts.
-
-    Only removes files older than *stale_minutes* (default 24 h) to
-    avoid deleting artifacts that belong to active Spark sessions.
-    Spark cleans up its own ``blockmgr-*`` and ``spark-*`` directories
-    when a session stops normally; this function only handles leftovers
-    from crashed or abnormally terminated sessions.
-    """
-    if not SPARK_TMP_DIR.exists():
-        return
-
-    stale_threshold = time.time() - (stale_minutes * 60)
-    removed = 0
-
-    for p in SPARK_TMP_DIR.iterdir():
-        try:
-            if p.stat().st_mtime < stale_threshold:
-                if p.is_dir():
-                    shutil.rmtree(p)
-                else:
-                    p.unlink()
-                removed += 1
-        except OSError as exc:
-            logger.debug('Failed to remove %s: %s', p, exc)
-
-    if removed:
-        logger.info('Cleaned up %d stale Spark temp artifact(s) from %s', removed, SPARK_TMP_DIR)
