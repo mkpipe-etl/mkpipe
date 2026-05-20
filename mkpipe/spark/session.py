@@ -141,37 +141,31 @@ def create_spark_session(
     return _create_with_retry(conf)
 
 
-def cleanup_spark_tmp() -> None:
-    """Remove stale Spark temp artifacts from the temp directory.
+def cleanup_spark_tmp(spark=None, stale_minutes: int = 1440) -> None:
+    """Remove stale/orphan Spark temp artifacts.
 
-    Cleans both ``SPARK_TMP_DIR`` (shuffle data) and ``/tmp``
-    (JVM native libs, hsperfdata) to prevent Docker overlay bloat.
+    Only removes files older than *stale_minutes* (default 24 h) to
+    avoid deleting artifacts that belong to active Spark sessions.
+    Spark cleans up its own ``blockmgr-*`` and ``spark-*`` directories
+    when a session stops normally; this function only handles leftovers
+    from crashed or abnormally terminated sessions.
     """
-    spark_patterns = ['blockmgr-*', 'spark-*']
-    jvm_patterns = ['liblz4-*', 'hsperfdata_*']
+    if not SPARK_TMP_DIR.exists():
+        return
+
+    stale_threshold = time.time() - (stale_minutes * 60)
     removed = 0
 
-    for pattern in spark_patterns:
-        for p in SPARK_TMP_DIR.glob(pattern):
-            try:
+    for p in SPARK_TMP_DIR.iterdir():
+        try:
+            if p.stat().st_mtime < stale_threshold:
                 if p.is_dir():
                     shutil.rmtree(p)
                 else:
                     p.unlink()
                 removed += 1
-            except OSError as exc:
-                logger.debug('Failed to remove %s: %s', p, exc)
+        except OSError as exc:
+            logger.debug('Failed to remove %s: %s', p, exc)
 
-    tmp_dir = Path('/tmp')
-    for pattern in jvm_patterns:
-        for p in tmp_dir.glob(pattern):
-            try:
-                if p.is_dir():
-                    shutil.rmtree(p)
-                else:
-                    p.unlink()
-                removed += 1
-            except OSError as exc:
-                logger.debug('Failed to remove %s: %s', p, exc)
     if removed:
-        logger.info('Cleaned up %d Spark temp artifact(s) from %s', removed, SPARK_TMP_DIR)
+        logger.info('Cleaned up %d stale Spark temp artifact(s) from %s', removed, SPARK_TMP_DIR)

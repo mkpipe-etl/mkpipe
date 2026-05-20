@@ -238,7 +238,7 @@ def run(
                 )
     finally:
         from .spark.session import cleanup_spark_tmp
-        cleanup_spark_tmp()
+        cleanup_spark_tmp(spark)
 
 
 def extract(
@@ -276,7 +276,7 @@ def extract(
         raise ConfigError(f"Table '{table}' not found in any pipeline")
     finally:
         from .spark.session import cleanup_spark_tmp
-        cleanup_spark_tmp()
+        cleanup_spark_tmp(spark)
 
 
 def load(
@@ -317,4 +317,4 @@ def load(
         raise ConfigError(f"Table '{table}' not found in any pipeline")
     finally:
         from .spark.session import cleanup_spark_tmp
-        cleanup_spark_tmp()
+        cleanup_spark_tmp(spark)
