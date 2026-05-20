@@ -1,13 +1,17 @@
 import logging
 import random
+import shutil
 import time
+from pathlib import Path
+from typing import Optional
 
 import psutil
-from typing import Optional
 
 from ..models import SparkConfig
 
 logger = logging.getLogger(__name__)
+
+SPARK_TMP_DIR = Path('/tmp/spark-tmp')
 
 
 def _get_container_memory_limit():
@@ -120,6 +124,7 @@ def create_spark_session(
     if packages:
         conf.set('spark.jars.packages', packages)
 
+    conf.set('spark.local.dir', str(SPARK_TMP_DIR))
     conf.set('spark.network.timeout', '600s')
     conf.set('spark.sql.parquet.datetimeRebaseModeInRead', 'CORRECTED')
     conf.set('spark.sql.parquet.datetimeRebaseModeInWrite', 'CORRECTED')
@@ -132,4 +137,41 @@ def create_spark_session(
     for key, value in extra_config.items():
         conf.set(key, value)
 
+    SPARK_TMP_DIR.mkdir(parents=True, exist_ok=True)
     return _create_with_retry(conf)
+
+
+def cleanup_spark_tmp() -> None:
+    """Remove stale Spark temp artifacts from the temp directory.
+
+    Cleans both ``SPARK_TMP_DIR`` (shuffle data) and ``/tmp``
+    (JVM native libs, hsperfdata) to prevent Docker overlay bloat.
+    """
+    spark_patterns = ['blockmgr-*', 'spark-*']
+    jvm_patterns = ['liblz4-*', 'hsperfdata_*']
+    removed = 0
+
+    for pattern in spark_patterns:
+        for p in SPARK_TMP_DIR.glob(pattern):
+            try:
+                if p.is_dir():
+                    shutil.rmtree(p)
+                else:
+                    p.unlink()
+                removed += 1
+            except OSError as exc:
+                logger.debug('Failed to remove %s: %s', p, exc)
+
+    tmp_dir = Path('/tmp')
+    for pattern in jvm_patterns:
+        for p in tmp_dir.glob(pattern):
+            try:
+                if p.is_dir():
+                    shutil.rmtree(p)
+                else:
+                    p.unlink()
+                removed += 1
+            except OSError as exc:
+                logger.debug('Failed to remove %s: %s', p, exc)
+    if removed:
+        logger.info('Cleaned up %d Spark temp artifact(s) from %s', removed, SPARK_TMP_DIR)
