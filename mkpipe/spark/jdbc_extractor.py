@@ -146,37 +146,34 @@ class JdbcExtractor(BaseExtractor):
             )
 
         # --- Step 2: Build filter clause using iterate_column ---
-        if iterate_column_type == 'int':
-            range_cond = (
-                f'{iterate_col_normalized} >= {min_iterate} '
-                f'AND {iterate_col_normalized} <= {max_iterate}'
-            )
-        else:
-            range_cond = (
-                f"{iterate_col_normalized} >= '{min_iterate}' "
-                f"AND {iterate_col_normalized} <= '{max_iterate}'"
-            )
-
-        # On initial load, include rows where iterate_column is NULL
-        # (e.g. greatest(cdate, udate) when both are NULL).
-        # These rows would otherwise be lost because NULL comparisons
-        # evaluate to NULL/false in SQL.
-        if not last_point:
-            filter_clause = f'WHERE ({range_cond}) OR {iterate_col_normalized} IS NULL'
-        else:
+        if last_point:
+            if iterate_column_type == 'int':
+                range_cond = (
+                    f'{iterate_col_normalized} >= {min_iterate} '
+                    f'AND {iterate_col_normalized} <= {max_iterate}'
+                )
+            else:
+                range_cond = (
+                    f"{iterate_col_normalized} >= '{min_iterate}' "
+                    f"AND {iterate_col_normalized} <= '{max_iterate}'"
+                )
             filter_clause = f'WHERE {range_cond}'
+        else:
+            filter_clause = ''
 
         if custom_query:
-            updated_query = custom_query.replace('{query_filter}', f' {filter_clause} ')
+            placeholder = f' {filter_clause} ' if filter_clause else ' WHERE 1=1 '
+            updated_query = custom_query.replace('{query_filter}', placeholder)
         else:
             updated_query = f'(SELECT * FROM {name} {filter_clause}) q'
 
         # --- Step 3: Resolve partition bounds (may differ from iterate bounds) ---
         if partitions_count and partitions_column != iterate_col_normalized:
+            p_filter = filter_clause if filter_clause else ''
             p_bounds_query = (
                 f'(SELECT min({partitions_column}) AS p_min, '
                 f'max({partitions_column}) AS p_max '
-                f'FROM {name} {filter_clause}) q'
+                f'FROM {name} {p_filter}) q'
             )
             p_row = self._build_reader(spark, jdbc_url, p_bounds_query).first()
             p_lower_raw = p_row[0] if p_row and p_row[0] is not None else min_iterate
