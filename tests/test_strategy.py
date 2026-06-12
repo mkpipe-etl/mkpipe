@@ -172,3 +172,65 @@ class TestIfExistsSettingsConfig:
         table = _make_table()
         effective = table.if_exists or settings.if_exists
         assert effective == 'append'
+
+
+class TestFilterBounds:
+    def test_defaults_are_none(self):
+        table = _make_table()
+        assert table.filter_lower_bound is None
+        assert table.filter_upper_bound is None
+
+    def test_lower_bound_only(self):
+        table = _make_table(filter_lower_bound='2024-01-01')
+        assert table.filter_lower_bound == '2024-01-01'
+        assert table.filter_upper_bound is None
+
+    def test_upper_bound_only(self):
+        table = _make_table(filter_upper_bound='2024-12-31')
+        assert table.filter_lower_bound is None
+        assert table.filter_upper_bound == '2024-12-31'
+
+    def test_both_bounds(self):
+        table = _make_table(
+            filter_lower_bound='2024-01-01',
+            filter_upper_bound='2024-12-31',
+        )
+        assert table.filter_lower_bound == '2024-01-01'
+        assert table.filter_upper_bound == '2024-12-31'
+
+    def test_int_bounds(self):
+        table = _make_table(
+            filter_lower_bound='1000',
+            filter_upper_bound='5000',
+        )
+        assert table.filter_lower_bound == '1000'
+        assert table.filter_upper_bound == '5000'
+
+    def test_bounds_with_incremental(self):
+        table = _make_table(
+            replication_method='incremental',
+            iterate_column='created_at',
+            iterate_column_type='datetime',
+            filter_lower_bound='2024-01-01',
+            filter_upper_bound='2024-06-30',
+        )
+        assert table.replication_method.value == 'incremental'
+        assert table.filter_lower_bound == '2024-01-01'
+        assert table.filter_upper_bound == '2024-06-30'
+
+    def test_bounds_with_write_strategy(self):
+        table = _make_table(
+            filter_lower_bound='100',
+            write_strategy='upsert',
+            write_key=['id'],
+        )
+        assert table.filter_lower_bound == '100'
+        assert table.write_strategy == WriteStrategy.UPSERT
+
+    def test_bounds_independent_of_if_exists(self):
+        table = _make_table(
+            filter_lower_bound='2024-01-01',
+            if_exists='append',
+        )
+        assert table.filter_lower_bound == '2024-01-01'
+        assert table.if_exists == 'append'

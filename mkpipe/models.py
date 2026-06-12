@@ -45,6 +45,8 @@ class TableConfig(BaseModel):
     delta_z_order_by: Optional[List[str]] = None
     delta_properties: Dict[str, str] = Field(default_factory=dict)
     delta_schema_evolution: str = 'merge'
+    filter_lower_bound: Optional[str] = None
+    filter_upper_bound: Optional[str] = None
     write_strategy: Optional[WriteStrategy] = None
     write_key: Optional[List[str]] = None
     if_exists: Optional[str] = None

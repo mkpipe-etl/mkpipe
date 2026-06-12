@@ -99,10 +99,31 @@ class JdbcExtractor(BaseExtractor):
         fetchsize = table.fetchsize
         jdbc_url = self.build_jdbc_url()
 
+        has_static_bounds = table.filter_lower_bound is not None or table.filter_upper_bound is not None
+
         # --- Step 1: Get iterate_column bounds for the new data window ---
         iterate_col_normalized = self._normalize_partitions_column(iterate_column)
 
-        if last_point:
+        if has_static_bounds:
+            conditions = []
+            if table.filter_lower_bound is not None:
+                if iterate_column_type == 'int':
+                    conditions.append(f'{iterate_col_normalized} >= {table.filter_lower_bound}')
+                else:
+                    conditions.append(f"{iterate_col_normalized} >= '{table.filter_lower_bound}'")
+            if table.filter_upper_bound is not None:
+                if iterate_column_type == 'int':
+                    conditions.append(f'{iterate_col_normalized} < {table.filter_upper_bound}')
+                else:
+                    conditions.append(f"{iterate_col_normalized} < '{table.filter_upper_bound}'")
+            where_clause = ' AND '.join(conditions)
+            bounds_query = (
+                f'(SELECT min({iterate_col_normalized}) AS min_val, '
+                f'max({iterate_col_normalized}) AS max_val '
+                f'FROM {name} WHERE {where_clause}) q'
+            )
+            write_mode = 'overwrite'
+        elif last_point:
             if iterate_column_type == 'int':
                 last_point_expr = last_point
             else:
@@ -146,7 +167,7 @@ class JdbcExtractor(BaseExtractor):
             )
 
         # --- Step 2: Build filter clause using iterate_column ---
-        if last_point:
+        if has_static_bounds or last_point:
             if iterate_column_type == 'int':
                 range_cond = (
                     f'{iterate_col_normalized} >= {min_iterate} '

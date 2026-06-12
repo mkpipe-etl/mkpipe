@@ -344,6 +344,8 @@ pipelines:
 | `replication_method` | `full` | `full` or `incremental` |
 | `iterate_column` | `None` | Column for incremental tracking (required if incremental) |
 | `iterate_column_type` | `None` | `datetime` or `int` |
+| `filter_lower_bound` | `None` | Static lower bound for `iterate_column` (`>=`). Overrides lastpoint when set |
+| `filter_upper_bound` | `None` | Static upper bound for `iterate_column` (`<`). Overrides lastpoint when set |
 | `partitions_column` | iterate_column | Column for Spark JDBC partitioning |
 | `partitions_column_type` | auto | Type of partition column: `int` or `datetime`. Defaults to `int` if `partitions_column` is specified, otherwise inherits `iterate_column_type` |
 | `partitions_count` | `10` | Number of JDBC read partitions |
@@ -518,6 +520,52 @@ An ingestion timestamp column is always added to every row. The column name defa
   iterate_column_type: datetime
   dedup_columns: [id, updated_at]  # mkpipe_id = xxhash64(id, updated_at)
 ```
+
+### Filter Bounds (Static Range Extraction)
+
+By default, incremental replication uses the backend's last checkpoint (`last_point`) to determine which rows to extract. You can override this with static bounds using `filter_lower_bound` and `filter_upper_bound`:
+
+```yaml
+tables:
+  # Extract only rows where created_at >= '2024-01-01' AND created_at < '2024-07-01'
+  - name: public.orders
+    target_name: stg_orders
+    replication_method: incremental
+    iterate_column: created_at
+    iterate_column_type: datetime
+    filter_lower_bound: "2024-01-01"
+    filter_upper_bound: "2024-07-01"
+
+  # Lower bound only — extract everything from 2024 onwards
+  - name: public.events
+    target_name: stg_events
+    replication_method: incremental
+    iterate_column: event_id
+    iterate_column_type: int
+    filter_lower_bound: "1000000"
+
+  # Upper bound only — extract everything before a cutoff
+  - name: public.legacy_data
+    target_name: stg_legacy
+    replication_method: incremental
+    iterate_column: created_at
+    iterate_column_type: datetime
+    filter_upper_bound: "2023-01-01"
+```
+
+| Scenario | Filter Applied |
+|---|---|
+| Only `filter_lower_bound` set | `iterate_column >= lower_bound` |
+| Only `filter_upper_bound` set | `iterate_column < upper_bound` |
+| Both set | `iterate_column >= lower_bound AND iterate_column < upper_bound` |
+| Neither set | Normal lastpoint behavior (default) |
+
+When static bounds are set:
+- The `last_point` from the backend is **ignored** — bounds take full control
+- `write_mode` is set to `overwrite` (the target table is replaced with the bounded slice)
+- The `last_point_value` is still derived from `max(iterate_column)` in the result set
+
+This is useful for backfills, data migrations, or extracting a specific time window without affecting the incremental checkpoint.
 
 ### NULL Handling in iterate_column
 
