@@ -122,7 +122,7 @@ class JdbcExtractor(BaseExtractor):
                 f'max({iterate_col_normalized}) AS max_val '
                 f'FROM {name} WHERE {where_clause}) q'
             )
-            write_mode = 'overwrite'
+            write_mode = 'append'
         elif last_point:
             if iterate_column_type == 'int':
                 last_point_expr = last_point
