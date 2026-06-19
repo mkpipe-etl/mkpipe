@@ -101,8 +101,11 @@ class JdbcExtractor(BaseExtractor):
 
         has_static_bounds = table.filter_lower_bound is not None or table.filter_upper_bound is not None
 
-        # --- Step 1: Get iterate_column bounds for the new data window ---
+        # --- Step 1: Get iterate_column bounds (+ partition bounds in one query) ---
         iterate_col_normalized = self._normalize_partitions_column(iterate_column)
+        need_separate_p_bounds = (
+            partitions_count and partitions_column != iterate_col_normalized
+        )
 
         if has_static_bounds:
             conditions = []
@@ -117,9 +120,14 @@ class JdbcExtractor(BaseExtractor):
                 else:
                     conditions.append(f"{iterate_col_normalized} < '{table.filter_upper_bound}'")
             where_clause = ' AND '.join(conditions)
+            p_cols = (
+                f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
+                if need_separate_p_bounds else ''
+            )
             bounds_query = (
                 f'(SELECT min({iterate_col_normalized}) AS min_val, '
-                f'max({iterate_col_normalized}) AS max_val '
+                f'max({iterate_col_normalized}) AS max_val'
+                f'{p_cols} '
                 f'FROM {name} WHERE {where_clause}) q'
             )
             write_mode = 'append'
@@ -128,16 +136,26 @@ class JdbcExtractor(BaseExtractor):
                 last_point_expr = last_point
             else:
                 last_point_expr = f"'{last_point}'"
+            p_cols = (
+                f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
+                if need_separate_p_bounds else ''
+            )
             bounds_query = (
                 f'(SELECT min({iterate_col_normalized}) AS min_val, '
-                f'max({iterate_col_normalized}) AS max_val '
+                f'max({iterate_col_normalized}) AS max_val'
+                f'{p_cols} '
                 f'FROM {name} WHERE {iterate_col_normalized} >= {last_point_expr}) q'
             )
             write_mode = 'append'
         else:
+            p_cols = (
+                f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
+                if need_separate_p_bounds else ''
+            )
             bounds_query = (
                 f'(SELECT min({iterate_col_normalized}) AS min_val, '
-                f'max({iterate_col_normalized}) AS max_val '
+                f'max({iterate_col_normalized}) AS max_val'
+                f'{p_cols} '
                 f'FROM {name}) q'
             )
             write_mode = 'overwrite'
@@ -188,22 +206,11 @@ class JdbcExtractor(BaseExtractor):
         else:
             updated_query = f'(SELECT * FROM {name} {filter_clause}) q'
 
-        # --- Step 3: Resolve partition bounds (may differ from iterate bounds) ---
-        if partitions_count and partitions_column != iterate_col_normalized:
-            p_filter = filter_clause if filter_clause else ''
-            p_bounds_query = (
-                f'(SELECT min({partitions_column}) AS p_min, '
-                f'max({partitions_column}) AS p_max '
-                f'FROM {name} {p_filter}) q'
-            )
-            p_row = self._build_reader(spark, jdbc_url, p_bounds_query).first()
-            p_lower_raw = p_row[0] if p_row and p_row[0] is not None else min_iterate
-            p_upper_raw = p_row[1] if p_row and p_row[1] is not None else max_iterate
+        # --- Step 3: Resolve partition bounds (already fetched in combined query) ---
+        if need_separate_p_bounds:
+            p_lower_raw = row[2] if row[2] is not None else min_iterate
+            p_upper_raw = row[3] if row[3] is not None else max_iterate
 
-            # Determine partition column type:
-            # 1. If partitions_column_type explicitly set, use it
-            # 2. If partitions_column specified but type not set, default to 'int'
-            # 3. If partitions_column not specified, use iterate_column_type
             if table.partitions_column_type:
                 p_col_type = table.partitions_column_type
             elif table.partitions_column:
@@ -212,11 +219,9 @@ class JdbcExtractor(BaseExtractor):
                 p_col_type = iterate_column_type
 
             if p_col_type == 'int':
-                # Handle NUMERIC/DECIMAL types from PostgreSQL that come as decimal strings
                 p_lower = int(float(str(p_lower_raw)))
                 p_upper = int(float(str(p_upper_raw)))
             elif p_col_type == 'datetime':
-                # Handle datetime types
                 if hasattr(p_lower_raw, 'strftime'):
                     p_lower = p_lower_raw.strftime('%Y-%m-%d %H:%M:%S.%f')
                     p_upper = p_upper_raw.strftime('%Y-%m-%d %H:%M:%S.%f')
@@ -224,7 +229,6 @@ class JdbcExtractor(BaseExtractor):
                     p_lower = str(p_lower_raw)
                     p_upper = str(p_upper_raw)
             else:
-                # Fallback: keep raw values
                 p_lower = p_lower_raw
                 p_upper = p_upper_raw
         else:
