@@ -107,6 +107,14 @@ class JdbcExtractor(BaseExtractor):
             partitions_count and partitions_column != iterate_col_normalized
         )
 
+        if custom_query:
+            bounds_base_source = custom_query.replace(
+                '{query_filter}', ' WHERE 1=1 '
+            )
+            bounds_base_source = f'({bounds_base_source}) _bounds_src'
+        else:
+            bounds_base_source = name
+
         if has_static_bounds:
             conditions = []
             if table.filter_lower_bound is not None:
@@ -128,7 +136,7 @@ class JdbcExtractor(BaseExtractor):
                 f'(SELECT min({iterate_col_normalized}) AS min_val, '
                 f'max({iterate_col_normalized}) AS max_val'
                 f'{p_cols} '
-                f'FROM {name} WHERE {where_clause}) q'
+                f'FROM {bounds_base_source} WHERE {where_clause}) q'
             )
             write_mode = 'append'
         elif last_point:
@@ -144,7 +152,7 @@ class JdbcExtractor(BaseExtractor):
                 f'(SELECT min({iterate_col_normalized}) AS min_val, '
                 f'max({iterate_col_normalized}) AS max_val'
                 f'{p_cols} '
-                f'FROM {name} WHERE {iterate_col_normalized} >= {last_point_expr}) q'
+                f'FROM {bounds_base_source} WHERE {iterate_col_normalized} >= {last_point_expr}) q'
             )
             write_mode = 'append'
         else:
@@ -156,7 +164,7 @@ class JdbcExtractor(BaseExtractor):
                 f'(SELECT min({iterate_col_normalized}) AS min_val, '
                 f'max({iterate_col_normalized}) AS max_val'
                 f'{p_cols} '
-                f'FROM {name}) q'
+                f'FROM {bounds_base_source}) q'
             )
             write_mode = 'overwrite'
 
