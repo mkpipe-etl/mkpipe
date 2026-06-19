@@ -1,4 +1,5 @@
 import os
+import re
 from urllib.parse import quote_plus
 from typing import Dict, Optional
 
@@ -108,10 +109,12 @@ class JdbcExtractor(BaseExtractor):
         )
 
         if custom_query:
-            bounds_base_source = custom_query.replace(
-                '{query_filter}', ' WHERE 1=1 '
-            )
-            bounds_base_source = f'({bounds_base_source}) _bounds_src'
+            bounds_cq = custom_query.replace('{query_filter}', ' WHERE 1=1 ')
+            m = re.match(r'^\((.*)\)\s*\w+\s*$', bounds_cq.strip(), re.DOTALL)
+            if m:
+                bounds_base_source = f'({m.group(1).strip()}) _bounds_src'
+            else:
+                bounds_base_source = f'({bounds_cq}) _bounds_src'
         else:
             bounds_base_source = name
 
