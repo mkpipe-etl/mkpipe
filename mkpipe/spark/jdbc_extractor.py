@@ -82,19 +82,34 @@ class JdbcExtractor(BaseExtractor):
     def _normalize_partitions_column(self, col: str) -> str:
         return col.split(' as ')[0].strip()
 
+    def _build_or_where(self, columns: list, condition_builder) -> str:
+        if len(columns) == 1:
+            return condition_builder(columns[0])
+        parts = [f'({condition_builder(col)})' for col in columns]
+        return ' OR '.join(parts)
+
     def _extract_incremental(
         self, table: TableConfig, spark, last_point: Optional[str]
     ) -> ExtractResult:
         name = table.name
-        iterate_column = table.iterate_column
         iterate_column_type = table.iterate_column_type
         custom_query = self._resolve_custom_query(table)
 
-        if not iterate_column:
+        if not table.iterate_column:
             raise ConfigError(f"Table '{name}': incremental replication requires 'iterate_column'")
 
+        columns = table.iterate_columns
+        is_multi = table.is_multi_iterate_column
+
+        if is_multi:
+            iterate_col_normalized = f"GREATEST({', '.join(columns)})"
+        else:
+            iterate_col_normalized = self._normalize_partitions_column(columns[0])
+
         partitions_count = table.partitions_count
-        partitions_column_raw = table.partitions_column or iterate_column
+        partitions_column_raw = table.partitions_column or (
+            columns[0] if not is_multi else iterate_col_normalized
+        )
         partitions_column = self._normalize_partitions_column(partitions_column_raw)
         p_col_name = partitions_column_raw.split(' as ')[-1].strip()
         fetchsize = table.fetchsize
@@ -103,7 +118,15 @@ class JdbcExtractor(BaseExtractor):
         has_static_bounds = table.filter_lower_bound is not None or table.filter_upper_bound is not None
 
         # --- Step 1: Get iterate_column bounds (+ partition bounds in one query) ---
-        iterate_col_normalized = self._normalize_partitions_column(iterate_column)
+        if is_multi:
+            min_exprs = ', '.join(f'min({c})' for c in columns)
+            max_exprs = ', '.join(f'max({c})' for c in columns)
+            min_select = f'LEAST({min_exprs}) AS min_val'
+            max_select = f'GREATEST({max_exprs}) AS max_val'
+        else:
+            min_select = f'min({iterate_col_normalized}) AS min_val'
+            max_select = f'max({iterate_col_normalized}) AS max_val'
+
         need_separate_p_bounds = (
             partitions_count and partitions_column != iterate_col_normalized
         )
@@ -119,43 +142,49 @@ class JdbcExtractor(BaseExtractor):
             bounds_base_source = name
 
         if has_static_bounds:
-            conditions = []
-            if table.filter_lower_bound is not None:
-                if iterate_column_type == 'int':
-                    conditions.append(f'{iterate_col_normalized} >= {table.filter_lower_bound}')
-                else:
-                    conditions.append(f"{iterate_col_normalized} >= '{table.filter_lower_bound}'")
-            if table.filter_upper_bound is not None:
-                if iterate_column_type == 'int':
-                    conditions.append(f'{iterate_col_normalized} < {table.filter_upper_bound}')
-                else:
-                    conditions.append(f"{iterate_col_normalized} < '{table.filter_upper_bound}'")
-            where_clause = ' AND '.join(conditions)
+            def _static_cond(col):
+                parts = []
+                if table.filter_lower_bound is not None:
+                    if iterate_column_type == 'int':
+                        parts.append(f'{col} >= {table.filter_lower_bound}')
+                    else:
+                        parts.append(f"{col} >= '{table.filter_lower_bound}'")
+                if table.filter_upper_bound is not None:
+                    if iterate_column_type == 'int':
+                        parts.append(f'{col} < {table.filter_upper_bound}')
+                    else:
+                        parts.append(f"{col} < '{table.filter_upper_bound}'")
+                return ' AND '.join(parts)
+
+            where_clause = self._build_or_where(columns, _static_cond)
             p_cols = (
                 f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
                 if need_separate_p_bounds else ''
             )
             bounds_query = (
-                f'(SELECT min({iterate_col_normalized}) AS min_val, '
-                f'max({iterate_col_normalized}) AS max_val'
+                f'(SELECT {min_select}, {max_select}'
                 f'{p_cols} '
                 f'FROM {bounds_base_source} WHERE {where_clause}) q'
             )
             write_mode = 'append'
         elif last_point:
             if iterate_column_type == 'int':
-                last_point_expr = last_point
+                lp_val = last_point
             else:
-                last_point_expr = f"'{last_point}'"
+                lp_val = f"'{last_point}'"
+
+            def _lp_cond(col):
+                return f'{col} >= {lp_val}'
+
+            where_clause = self._build_or_where(columns, _lp_cond)
             p_cols = (
                 f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
                 if need_separate_p_bounds else ''
             )
             bounds_query = (
-                f'(SELECT min({iterate_col_normalized}) AS min_val, '
-                f'max({iterate_col_normalized}) AS max_val'
+                f'(SELECT {min_select}, {max_select}'
                 f'{p_cols} '
-                f'FROM {bounds_base_source} WHERE {iterate_col_normalized} >= {last_point_expr}) q'
+                f'FROM {bounds_base_source} WHERE {where_clause}) q'
             )
             write_mode = 'append'
         else:
@@ -164,8 +193,7 @@ class JdbcExtractor(BaseExtractor):
                 if need_separate_p_bounds else ''
             )
             bounds_query = (
-                f'(SELECT min({iterate_col_normalized}) AS min_val, '
-                f'max({iterate_col_normalized}) AS max_val'
+                f'(SELECT {min_select}, {max_select}'
                 f'{p_cols} '
                 f'FROM {bounds_base_source}) q'
             )
@@ -198,16 +226,14 @@ class JdbcExtractor(BaseExtractor):
         # --- Step 2: Build filter clause using iterate_column ---
         if has_static_bounds or last_point:
             if iterate_column_type == 'int':
-                range_cond = (
-                    f'{iterate_col_normalized} >= {min_iterate} '
-                    f'AND {iterate_col_normalized} <= {max_iterate}'
-                )
+                def _range_cond(col):
+                    return f'{col} >= {min_iterate} AND {col} <= {max_iterate}'
             else:
-                range_cond = (
-                    f"{iterate_col_normalized} >= '{min_iterate}' "
-                    f"AND {iterate_col_normalized} <= '{max_iterate}'"
-                )
-            filter_clause = f'WHERE {range_cond}'
+                def _range_cond(col):
+                    return f"{col} >= '{min_iterate}' AND {col} <= '{max_iterate}'"
+
+            range_expr = self._build_or_where(columns, _range_cond)
+            filter_clause = f'WHERE {range_expr}'
         else:
             filter_clause = ''
 

@@ -234,3 +234,67 @@ class TestFilterBounds:
         )
         assert table.filter_lower_bound == '2024-01-01'
         assert table.if_exists == 'append'
+
+
+class TestMultiIterateColumn:
+    def test_single_string_backward_compat(self):
+        table = _make_table(iterate_column='updated_at')
+        assert table.iterate_column == 'updated_at'
+        assert table.iterate_columns == ['updated_at']
+        assert table.is_multi_iterate_column is False
+
+    def test_sql_expression_backward_compat(self):
+        table = _make_table(iterate_column='greatest(created_at, updated_at)')
+        assert table.iterate_column == 'greatest(created_at, updated_at)'
+        assert table.iterate_columns == ['greatest(created_at, updated_at)']
+        assert table.is_multi_iterate_column is False
+
+    def test_list_single_element(self):
+        table = _make_table(iterate_column=['updated_at'])
+        assert table.iterate_columns == ['updated_at']
+        assert table.is_multi_iterate_column is False
+
+    def test_list_multi_column(self):
+        table = _make_table(iterate_column=['createdDate', 'updatedDate'])
+        assert table.iterate_columns == ['createdDate', 'updatedDate']
+        assert table.is_multi_iterate_column is True
+
+    def test_list_three_columns(self):
+        table = _make_table(iterate_column=['col_a', 'col_b', 'col_c'])
+        assert table.iterate_columns == ['col_a', 'col_b', 'col_c']
+        assert table.is_multi_iterate_column is True
+
+    def test_none_default(self):
+        table = _make_table()
+        assert table.iterate_column is None
+        assert table.iterate_columns == []
+        assert table.is_multi_iterate_column is False
+
+    def test_multi_with_incremental(self):
+        table = _make_table(
+            replication_method='incremental',
+            iterate_column=['createdDate', 'updatedDate'],
+            iterate_column_type='datetime',
+        )
+        assert table.replication_method.value == 'incremental'
+        assert table.is_multi_iterate_column is True
+        assert table.iterate_column_type == 'datetime'
+
+    def test_multi_with_filter_bounds(self):
+        table = _make_table(
+            iterate_column=['created_at', 'updated_at'],
+            filter_lower_bound='2024-01-01',
+            filter_upper_bound='2024-12-31',
+        )
+        assert table.is_multi_iterate_column is True
+        assert table.filter_lower_bound == '2024-01-01'
+        assert table.filter_upper_bound == '2024-12-31'
+
+    def test_multi_with_write_strategy(self):
+        table = _make_table(
+            iterate_column=['created_at', 'updated_at'],
+            write_strategy='upsert',
+            write_key=['id'],
+        )
+        assert table.is_multi_iterate_column is True
+        assert table.write_strategy == WriteStrategy.UPSERT

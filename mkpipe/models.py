@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -21,7 +21,7 @@ class TableConfig(BaseModel):
     name: str
     target_name: str
     replication_method: ReplicationMethod = ReplicationMethod.FULL
-    iterate_column: Optional[str] = None
+    iterate_column: Optional[Union[str, List[str]]] = None
     iterate_column_type: Optional[str] = None
     partitions_column: Optional[str] = None
     partitions_column_type: Optional[str] = None
@@ -51,6 +51,18 @@ class TableConfig(BaseModel):
     write_key: Optional[List[str]] = None
     if_exists: Optional[str] = None
     column_name_case: Optional[str] = None
+
+    @property
+    def iterate_columns(self) -> List[str]:
+        if self.iterate_column is None:
+            return []
+        if isinstance(self.iterate_column, list):
+            return self.iterate_column
+        return [self.iterate_column]
+
+    @property
+    def is_multi_iterate_column(self) -> bool:
+        return isinstance(self.iterate_column, list) and len(self.iterate_column) > 1
 
     @model_validator(mode='after')
     def _validate_write_strategy(self) -> 'TableConfig':

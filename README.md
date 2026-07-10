@@ -342,7 +342,7 @@ pipelines:
 | `target_name` | **required** | Destination table name |
 | `tags` | `[]` | List of tags for filtering (`--tags api,ingestion`) |
 | `replication_method` | `full` | `full` or `incremental` |
-| `iterate_column` | `None` | Column for incremental tracking (required if incremental) |
+| `iterate_column` | `None` | Column(s) for incremental tracking. String for single column or SQL expression (e.g. `greatest(a,b)`), list for multi-column OR logic (e.g. `[createdDate, updatedDate]`) |
 | `iterate_column_type` | `None` | `datetime` or `int` |
 | `filter_lower_bound` | `None` | Static lower bound for `iterate_column` (`>=`). Overrides lastpoint when set |
 | `filter_upper_bound` | `None` | Static upper bound for `iterate_column` (`<`). Overrides lastpoint when set |
@@ -566,6 +566,42 @@ When static bounds are set:
 - The `last_point_value` is still derived from `max(iterate_column)` in the result set
 
 This is useful for backfills, data migrations, or extracting a specific time window without affecting the incremental checkpoint.
+
+### Multi-Column Incremental
+
+When a table has separate `createdDate` and `updatedDate` columns, you can pass `iterate_column` as a YAML list. mkpipe will use **OR logic** — a row is extracted if *any* of the columns meets the threshold:
+
+```yaml
+tables:
+  - name: product
+    target_name: stg_product
+    replication_method: incremental
+    iterate_column:
+      - createdDate
+      - updatedDate
+    iterate_column_type: datetime
+```
+
+Each extractor translates the list into its native OR syntax:
+
+| Extractor | Generated Filter |
+|---|---|
+| JDBC (Postgres, MySQL, …) | `WHERE (createdDate >= lp) OR (updatedDate >= lp)` |
+| MongoDB | `{$match: {$or: [{createdDate: {$gte: lp}}, {updatedDate: {$gte: lp}}]}}` |
+| BigQuery / Snowflake / ClickHouse | `WHERE createdDate >= lp OR updatedDate >= lp` |
+| Spark-based (File, Cassandra) | `F.col("createdDate") >= lp | F.col("updatedDate") >= lp` |
+| Elasticsearch | `bool/should` with `minimum_should_match: 1` |
+| DynamoDB | `Attr("createdDate").gte(lp) \| Attr("updatedDate").gte(lp)` |
+
+The `last_point_value` is computed as the **greatest** max across all listed columns, so the next run picks up any change in either column.
+
+If you prefer a single SQL expression instead (e.g. for JDBC), you can still use a string:
+
+```yaml
+iterate_column: "greatest(createdDate, updatedDate)"
+```
+
+Both approaches are valid. The list form has the advantage of letting each extractor use index-optimized OR queries (e.g. MongoDB `IXOR` index scan).
 
 ### NULL Handling in iterate_column
 
