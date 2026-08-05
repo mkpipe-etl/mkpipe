@@ -707,7 +707,27 @@ SELECT *, greatest(cdate,udate) AS _part_ts FROM apld_bill_rt_tax
 WHERE greatest(cdate,udate) >= 'min' AND greatest(cdate,udate) <= 'max'
 ```
 
-Each partition predicate then becomes a range scan on `_part_ts`, which maps directly onto a `(greatest(cdate,udate))` index. If you supply your own `custom_query`, the alias is *not* injected — expose it yourself.
+Each partition predicate then becomes a range scan on `_part_ts`, which maps directly onto a `(greatest(cdate,udate))` index.
+
+This also works with `custom_query` / `custom_query_file` — mkpipe wraps your query so you do not have to touch it:
+
+```sql
+-- your custom query
+(
+    SELECT * FROM (
+        SELECT * FROM ctx_aggr_rcrds
+        WHERE period_retention_date >= date_trunc('month', current_date - interval '1 month')
+    ) t
+    {query_filter}
+) q
+
+-- what mkpipe actually sends
+(SELECT *, greatest(cdate,udate) AS partts FROM (
+    SELECT * FROM (...) t WHERE greatest(cdate,udate) >= '...' AND greatest(cdate,udate) <= '...'
+) _p) q
+```
+
+If your query already exposes a column with the alias name (`... AS partts`), mkpipe detects it and skips the wrapping. Either way the alias column is dropped from the DataFrame before loading.
 
 Note that `lowerBound`/`upperBound` support `TimestampType` and `DateType` in addition to numeric types. Timestamp values are parsed using `spark.sql.session.timeZone`, so keep it aligned with the database timezone.
 

@@ -82,6 +82,17 @@ class JdbcExtractor(BaseExtractor):
     def _normalize_partitions_column(self, col: str) -> str:
         return col.split(' as ')[0].strip()
 
+    def _unwrap_subquery(self, query: str) -> str:
+        stripped = query.strip()
+        m = re.match(r'^\((.*)\)\s*\w+\s*$', stripped, re.DOTALL)
+        return m.group(1).strip() if m else stripped
+
+    def _wrap_with_partition_alias(self, query: str, expr: str, alias: str) -> str:
+        if re.search(rf'\bAS\s+{re.escape(alias)}\b', query, re.IGNORECASE):
+            return query
+        inner = self._unwrap_subquery(query)
+        return f'(SELECT *, {expr} AS {alias} FROM ({inner}) _p) q'
+
     def _build_or_where(self, columns: list, condition_builder) -> str:
         if len(columns) == 1:
             return condition_builder(columns[0])
@@ -137,11 +148,7 @@ class JdbcExtractor(BaseExtractor):
 
         if custom_query:
             bounds_cq = custom_query.replace('{query_filter}', ' WHERE 1=1 ')
-            m = re.match(r'^\((.*)\)\s*\w+\s*$', bounds_cq.strip(), re.DOTALL)
-            if m:
-                bounds_base_source = f'({m.group(1).strip()}) _bounds_src'
-            else:
-                bounds_base_source = f'({bounds_cq}) _bounds_src'
+            bounds_base_source = f'({self._unwrap_subquery(bounds_cq)}) _bounds_src'
         else:
             bounds_base_source = name
 
@@ -224,11 +231,15 @@ class JdbcExtractor(BaseExtractor):
         else:
             filter_clause = ''
 
-        inject_alias = bool(p_alias and partitions_count and not custom_query)
+        inject_alias = bool(p_alias and partitions_count)
 
         if custom_query:
             placeholder = f' {filter_clause} ' if filter_clause else ' WHERE 1=1 '
             updated_query = custom_query.replace('{query_filter}', placeholder)
+            if inject_alias:
+                updated_query = self._wrap_with_partition_alias(
+                    updated_query, partitions_column, p_alias
+                )
         elif inject_alias:
             updated_query = (
                 f'(SELECT *, {partitions_column} AS {p_alias} FROM {name} {filter_clause}) q'

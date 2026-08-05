@@ -166,18 +166,46 @@ def test_alias_partition_column_injects_and_drops_column(connection):
     assert result.df.dropped == ['_part_ts']
 
 
-def test_alias_not_injected_when_custom_query_given(connection):
+def test_custom_query_is_wrapped_with_partition_alias(connection):
+    table = TableConfig(
+        name='ctx_aggr_rcrds',
+        target_name='raw_ctx_aggr_rcrds',
+        replication_method='incremental',
+        iterate_column='greatest(cdate,udate)',
+        iterate_column_type='datetime',
+        partitions_column='greatest(cdate,udate) as partts',
+        partitions_column_type='datetime',
+        partitions_count=4,
+        custom_query=(
+            '(\n    SELECT *\n    FROM (\n        SELECT * FROM ctx_aggr_rcrds\n'
+            "        WHERE period_retention_date >= date_trunc('month', current_date)\n"
+            '    ) t\n    {query_filter}\n) q'
+        ),
+    )
+    extractor = RecordingExtractor(connection, [_bounds_row(), None])
+
+    result = extractor.extract(table, spark=None, last_point='2026-07-28 01:38:06.816212')
+
+    data_query = extractor.queries[1]
+    assert data_query.startswith('(SELECT *, greatest(cdate,udate) AS partts FROM (')
+    assert data_query.endswith(') _p) q')
+    assert "WHERE period_retention_date >= date_trunc('month', current_date)" in data_query
+    assert extractor.calls[-1]['partition_column'] == 'partts'
+    assert result.df.dropped == ['partts']
+
+
+def test_custom_query_already_exposing_alias_is_not_rewrapped(connection):
     table = TableConfig(
         name='apld_bill_rt_tax',
         target_name='raw_apld_bill_rt_tax',
         replication_method='incremental',
         iterate_column='greatest(cdate,udate)',
         iterate_column_type='datetime',
-        partitions_column='greatest(cdate,udate) as _part_ts',
+        partitions_column='greatest(cdate,udate) as partts',
         partitions_column_type='datetime',
         partitions_count=4,
         custom_query=(
-            '(SELECT *, greatest(cdate,udate) AS _part_ts '
+            '(SELECT *, greatest(cdate,udate) AS partts '
             'FROM apld_bill_rt_tax {query_filter}) q'
         ),
     )
@@ -185,4 +213,7 @@ def test_alias_not_injected_when_custom_query_given(connection):
 
     result = extractor.extract(table, spark=None, last_point='2026-07-28 01:38:06.816212')
 
-    assert result.df.dropped == []
+    data_query = extractor.queries[1]
+    assert data_query.count('AS partts') == 1
+    assert '_p) q' not in data_query
+    assert result.df.dropped == ['partts']
