@@ -346,9 +346,12 @@ pipelines:
 | `iterate_column_type` | `None` | `datetime` or `int` |
 | `filter_lower_bound` | `None` | Static lower bound for `iterate_column` (`>=`). Overrides lastpoint when set |
 | `filter_upper_bound` | `None` | Static upper bound for `iterate_column` (`<`). Overrides lastpoint when set |
-| `partitions_column` | iterate_column | Column for Spark JDBC partitioning |
+| `partitions_column` | iterate_column | Column for Spark JDBC partitioning. Also accepts `expr as alias` (e.g. `"greatest(cdate,udate) as _part_ts"`) |
 | `partitions_column_type` | auto | Type of partition column: `int` or `datetime`. Defaults to `int` if `partitions_column` is specified, otherwise inherits `iterate_column_type` |
 | `partitions_count` | `10` | Number of JDBC read partitions |
+| `partitions_lower_bound` | `None` | Static lower bound for the partition column. Skips the partition bounds query entirely |
+| `partitions_upper_bound` | `None` | Static upper bound for the partition column. Skips the partition bounds query entirely |
+| `partitions_bounds_filtered` | `false` | Apply the incremental filter when computing partition bounds. Slower but yields more balanced partitions |
 | `fetchsize` | `100000` | JDBC fetch size (rows per network round trip) |
 | `batchsize` | `10000` | JDBC write batch size |
 | `write_partitions` | `None` | Number of write partitions (coalesce before writing) |
@@ -646,6 +649,75 @@ The `partitions_column_type` parameter controls how partition bounds are convert
   partitions_column: event_timestamp
   partitions_column_type: datetime  # Must be explicit if different from iterate_column_type
 ```
+
+### Partition Bounds on Large Tables
+
+Before reading, the JDBC extractor needs `lowerBound`/`upperBound` for the partition column. mkpipe resolves these with **two separate queries** so that databases can use their `min`/`max` index shortcuts:
+
+```sql
+-- 1. iterate bounds (index shortcut on the iterate_column index)
+SELECT min(greatest(cdate,udate)), max(greatest(cdate,udate))
+FROM apld_bill_rt_tax WHERE greatest(cdate,udate) >= '2026-07-28 01:38:06'
+
+-- 2. partition bounds (unfiltered → index-only min/max on the partition key)
+SELECT min(acct_bill_id), max(acct_bill_id) FROM apld_bill_rt_tax
+```
+
+Keeping them in one `SELECT` would force a full aggregate scan, which on very large tables (hundreds of GB) can take hours.
+
+The partition bounds query is **unfiltered by default**. This is safe — Spark's first and last partitions are unbounded, so rows outside the range are never lost — but it can make partitions uneven, since recently inserted rows tend to cluster at one end of the key range.
+
+Three ways to control this:
+
+**1. Static bounds (zero cost)**
+
+```yaml
+- name: apld_bill_rt_tax
+  replication_method: incremental
+  iterate_column: "greatest(cdate,udate)"
+  iterate_column_type: datetime
+  partitions_column: acct_bill_id
+  partitions_lower_bound: 800000000
+  partitions_upper_bound: 900000000
+```
+
+No bounds query is issued at all. A rough estimate is enough.
+
+**2. Partition on the iterate expression (recommended)**
+
+When `partitions_column` normalizes to the same expression as `iterate_column`, mkpipe reuses the iterate bounds and **issues no partition bounds query**. Partitions also spread evenly, because the filter and the partition key are the same expression:
+
+```yaml
+- name: apld_bill_rt_tax
+  target_name: raw_i2i__apld_bill_rt_tax
+  replication_method: incremental
+  iterate_column: "greatest(cdate,udate)"
+  iterate_column_type: datetime
+  dedup_columns: [acct_bill_id, seq_num]
+  partitions_column: "greatest(cdate,udate) as _part_ts"
+  partitions_column_type: datetime
+  partitions_count: 128
+  fetchsize: 10000
+```
+
+The `as _part_ts` alias is required because Spark quotes `partitionColumn` as an identifier and cannot use a raw SQL expression. mkpipe injects the alias into the generated query and **drops it from the DataFrame after loading**, so it never reaches the target table:
+
+```sql
+SELECT *, greatest(cdate,udate) AS _part_ts FROM apld_bill_rt_tax
+WHERE greatest(cdate,udate) >= 'min' AND greatest(cdate,udate) <= 'max'
+```
+
+Each partition predicate then becomes a range scan on `_part_ts`, which maps directly onto a `(greatest(cdate,udate))` index. If you supply your own `custom_query`, the alias is *not* injected — expose it yourself.
+
+Note that `lowerBound`/`upperBound` support `TimestampType` and `DateType` in addition to numeric types. Timestamp values are parsed using `spark.sql.session.timeZone`, so keep it aligned with the database timezone.
+
+**3. Filtered bounds (accurate but slow)**
+
+```yaml
+partitions_bounds_filtered: true
+```
+
+Restores the pre-optimization behaviour: the partition bounds query carries the incremental filter. Only use this when the filter is cheap to evaluate.
 
 Downstream dedup query example:
 

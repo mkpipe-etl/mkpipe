@@ -26,6 +26,9 @@ class TableConfig(BaseModel):
     partitions_column: Optional[str] = None
     partitions_column_type: Optional[str] = None
     partitions_count: int = 10
+    partitions_lower_bound: Optional[Union[int, str]] = None
+    partitions_upper_bound: Optional[Union[int, str]] = None
+    partitions_bounds_filtered: bool = False
     fetchsize: int = 100_000
     batchsize: int = 10_000
     write_partitions: Optional[int] = None

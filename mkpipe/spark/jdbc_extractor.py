@@ -112,6 +112,7 @@ class JdbcExtractor(BaseExtractor):
         )
         partitions_column = self._normalize_partitions_column(partitions_column_raw)
         p_col_name = partitions_column_raw.split(' as ')[-1].strip()
+        p_alias = p_col_name if ' as ' in partitions_column_raw.lower() else None
         fetchsize = table.fetchsize
         jdbc_url = self.build_jdbc_url()
 
@@ -129,6 +130,9 @@ class JdbcExtractor(BaseExtractor):
 
         need_separate_p_bounds = (
             partitions_count and partitions_column != iterate_col_normalized
+        )
+        has_static_p_bounds = (
+            table.partitions_lower_bound is not None and table.partitions_upper_bound is not None
         )
 
         if custom_query:
@@ -157,13 +161,8 @@ class JdbcExtractor(BaseExtractor):
                 return ' AND '.join(parts)
 
             where_clause = self._build_or_where(columns, _static_cond)
-            p_cols = (
-                f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
-                if need_separate_p_bounds else ''
-            )
             bounds_query = (
-                f'(SELECT {min_select}, {max_select}'
-                f'{p_cols} '
+                f'(SELECT {min_select}, {max_select} '
                 f'FROM {bounds_base_source} WHERE {where_clause}) q'
             )
             write_mode = 'append'
@@ -177,26 +176,14 @@ class JdbcExtractor(BaseExtractor):
                 return f'{col} >= {lp_val}'
 
             where_clause = self._build_or_where(columns, _lp_cond)
-            p_cols = (
-                f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
-                if need_separate_p_bounds else ''
-            )
             bounds_query = (
-                f'(SELECT {min_select}, {max_select}'
-                f'{p_cols} '
+                f'(SELECT {min_select}, {max_select} '
                 f'FROM {bounds_base_source} WHERE {where_clause}) q'
             )
             write_mode = 'append'
         else:
-            p_cols = (
-                f', min({partitions_column}) AS p_min, max({partitions_column}) AS p_max'
-                if need_separate_p_bounds else ''
-            )
-            bounds_query = (
-                f'(SELECT {min_select}, {max_select}'
-                f'{p_cols} '
-                f'FROM {bounds_base_source}) q'
-            )
+            where_clause = ''
+            bounds_query = f'(SELECT {min_select}, {max_select} FROM {bounds_base_source}) q'
             write_mode = 'overwrite'
 
         df_bounds = self._build_reader(spark, jdbc_url, bounds_query)
@@ -237,16 +224,37 @@ class JdbcExtractor(BaseExtractor):
         else:
             filter_clause = ''
 
+        inject_alias = bool(p_alias and partitions_count and not custom_query)
+
         if custom_query:
             placeholder = f' {filter_clause} ' if filter_clause else ' WHERE 1=1 '
             updated_query = custom_query.replace('{query_filter}', placeholder)
+        elif inject_alias:
+            updated_query = (
+                f'(SELECT *, {partitions_column} AS {p_alias} FROM {name} {filter_clause}) q'
+            )
         else:
             updated_query = f'(SELECT * FROM {name} {filter_clause}) q'
 
-        # --- Step 3: Resolve partition bounds (already fetched in combined query) ---
+        # --- Step 3: Resolve partition bounds ---
         if need_separate_p_bounds:
-            p_lower_raw = row[2] if row[2] is not None else min_iterate
-            p_upper_raw = row[3] if row[3] is not None else max_iterate
+            if has_static_p_bounds:
+                p_lower_raw = table.partitions_lower_bound
+                p_upper_raw = table.partitions_upper_bound
+            else:
+                p_where = (
+                    f' WHERE {where_clause}'
+                    if where_clause and table.partitions_bounds_filtered
+                    else ''
+                )
+                p_bounds_query = (
+                    f'(SELECT min({partitions_column}) AS p_min, '
+                    f'max({partitions_column}) AS p_max '
+                    f'FROM {bounds_base_source}{p_where}) q'
+                )
+                p_row = self._build_reader(spark, jdbc_url, p_bounds_query).first()
+                p_lower_raw = p_row[0] if p_row and p_row[0] is not None else min_iterate
+                p_upper_raw = p_row[1] if p_row and p_row[1] is not None else max_iterate
 
             if table.partitions_column_type:
                 p_col_type = table.partitions_column_type
@@ -282,6 +290,9 @@ class JdbcExtractor(BaseExtractor):
             lower_bound=p_lower,
             upper_bound=p_upper,
         )
+
+        if inject_alias:
+            df = df.drop(p_alias)
 
         return ExtractResult(
             df=df,
