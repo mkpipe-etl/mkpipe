@@ -8,12 +8,10 @@ from dotenv import load_dotenv
 
 from .exceptions import ConfigError
 from .models import (
-    BackendConfig,
     ConnectionConfig,
     MkpipeConfig,
     PipelineConfig,
     SettingsConfig,
-    SparkConfig,
     TableConfig,
 )
 
@@ -62,16 +60,8 @@ def load_config(path: Union[str, Path]) -> MkpipeConfig:
     env_data = _resolve_env_vars(env_data)
     version = raw.get('version', 2)
 
-    settings_raw = env_data.get('settings', {})
-    settings = SettingsConfig(
-        timezone=settings_raw.get('timezone', 'UTC'),
-        log_dir=settings_raw.get('log_dir'),
-        ingested_at_column=settings_raw.get('ingested_at_column', '_ingested_at'),
-        ingestion_id_column=settings_raw.get('ingestion_id_column', 'mkpipe_id'),
-        column_name_case=settings_raw.get('column_name_case', 'as_is'),
-        backend=BackendConfig(**settings_raw.get('backend', {})),
-        spark=SparkConfig(**settings_raw.get('spark', {})),
-    )
+    settings_raw = env_data.get('settings', {}) or {}
+    settings = SettingsConfig(**settings_raw)
 
     connections: Dict[str, ConnectionConfig] = {}
     for name, conn_raw in env_data.get('connections', {}).items():
