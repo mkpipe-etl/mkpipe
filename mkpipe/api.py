@@ -60,7 +60,6 @@ def _run_table(
     target_name = table.target_name
     replication_method = table.replication_method.value
     pass_on_error = table.pass_on_error
-    data = None
 
     try:
         status = backend.get_table_status(pipeline_name, target_name)
@@ -162,17 +161,6 @@ def _run_table(
 
         if not pass_on_error:
             raise
-    finally:
-        # Extractors may cache the df (see BaseExtractor._cached); make sure
-        # cached blocks are always released, even if the loader failed or
-        # skipped its own unpersist. unpersist is idempotent.
-        if data is not None and data.df is not None:
-            try:
-                data.df.unpersist(blocking=False)
-            except Exception as e:
-                logger.warning(
-                    {'table': target_name, 'status': 'unpersist_failed', 'error': str(e)}
-                )
 
 
 def run(
