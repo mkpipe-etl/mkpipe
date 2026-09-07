@@ -1,8 +1,17 @@
+import warnings
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
+
+# ConnectionConfig/BackendConfig use a `schema` field; renaming it would break
+# plugins across separate packages, so we silence only this shadowing warning.
+warnings.filterwarnings(
+    'ignore',
+    message=r'Field name "schema" .* shadows an attribute in parent "BaseModel"',
+    category=UserWarning,
+)
 
 
 class ReplicationMethod(str, Enum):
