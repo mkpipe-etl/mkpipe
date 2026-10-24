@@ -1,13 +1,21 @@
 import logging
 import random
 import time
-from typing import Optional
+from typing import Dict, Optional
 
 import psutil
 
 from ..models import SparkConfig
 
 logger = logging.getLogger(__name__)
+
+COMET_CONFS = {
+    'spark.plugins': 'org.apache.spark.CometPlugin',
+    'spark.shuffle.manager': 'org.apache.spark.sql.comet.execution.shuffle.CometShuffleManager',
+    'spark.comet.explain.fallback.enabled': 'true',
+    # mkpipe sets KryoSerializer; Comet requires its own registrator.
+    'spark.kryo.registrator': 'org.apache.comet.CometKryoRegistrator',
+}
 
 
 def _get_container_memory_limit():
@@ -30,6 +38,37 @@ def _default_memory():
     driver = f'{max(1024, int(total_mem * 0.2))}m'
     executor = f'{max(2048, int(total_mem * 0.6))}m'
     return driver, executor
+
+
+def _merge_comet_config(
+    extra_config: Dict[str, str],
+    packages: str,
+    jars: str = '',
+) -> Dict[str, str]:
+    """Merge Comet defaults into extra_config.
+
+    The Comet package is appended to the effective ``spark.jars.packages``
+    value (extra_config takes precedence over the ``packages`` param, matching
+    the existing override order). User-provided extra_config values win over
+    the Comet defaults. When the Comet JAR is already on the classpath via
+    ``spark.jars`` (pre-downloaded by ``mkpipe install-jars``), Maven
+    resolution is skipped.
+    """
+    from ..plugins.jars import comet_package
+
+    merged = {**COMET_CONFS, **extra_config}
+    base_packages = extra_config.get('spark.jars.packages') or packages
+    if 'comet-spark' in jars or 'comet-spark' in base_packages:
+        # Comet JAR served locally, or the user already pinned their own
+        # Comet coordinate in extra_config — keep it as-is.
+        if base_packages:
+            merged['spark.jars.packages'] = base_packages
+    else:
+        comet_pkg = comet_package()
+        merged['spark.jars.packages'] = (
+            f'{base_packages},{comet_pkg}' if base_packages else comet_pkg
+        )
+    return merged
 
 
 def _create_with_retry(
@@ -100,6 +139,10 @@ def create_spark_session(
         driver_memory = config.driver_memory or default_driver_mem
         executor_memory = config.executor_memory or default_executor_mem
         extra_config = config.extra_config or {}
+
+    if config and config.comet:
+        extra_config = _merge_comet_config(extra_config, packages, jars)
+        logger.info('Comet enabled (packages: %s)', extra_config['spark.jars.packages'])
 
     driver_java_options = (
         f'-Duser.timezone={timezone} -XX:ErrorFile=/tmp/java_error%p.log -XX:HeapDumpPath=/tmp '

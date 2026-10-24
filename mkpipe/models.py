@@ -114,6 +114,7 @@ class SparkConfig(BaseModel):
     master: Optional[str] = None
     driver_memory: Optional[str] = None
     executor_memory: Optional[str] = None
+    comet: bool = False
     extra_config: Dict[str, str] = Field(default_factory=dict)
 
 

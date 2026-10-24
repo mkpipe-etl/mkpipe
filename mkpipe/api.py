@@ -32,7 +32,7 @@ def _ensure_spark(spark, cfg: MkpipeConfig):
     from .plugins.jars import collect_jars
     from .spark.session import create_spark_session
 
-    jars, packages = collect_jars()
+    jars, packages = collect_jars(comet=cfg.settings.spark.comet)
     return create_spark_session(
         config=cfg.settings.spark,
         jars=jars,
@@ -86,11 +86,13 @@ def _run_table(
         data = extractor.extract(table, spark, last_point=last_point)
 
         if data.df is not None:
-            logger.debug({
-                'table': target_name,
-                'status': 'schema_after_extract',
-                'schema': {f.name: f.dataType.simpleString() for f in data.df.schema.fields},
-            })
+            logger.debug(
+                {
+                    'table': target_name,
+                    'status': 'schema_after_extract',
+                    'schema': {f.name: f.dataType.simpleString() for f in data.df.schema.fields},
+                }
+            )
 
         # --- TRANSFORM ---
         if data.df is not None and transform_fn is not None:

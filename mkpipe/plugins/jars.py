@@ -5,6 +5,39 @@ from typing import Dict, List, Tuple
 
 _ENTRY_POINT_GROUPS = ['mkpipe.extractors', 'mkpipe.loaders']
 
+COMET_VERSION = '1.1.0'
+
+# Core-level Maven packages pre-downloaded by `mkpipe install-jars` into
+# mkpipe/jars/ so runtime sessions can stay offline. Served via spark.jars
+# when the comet flag is enabled (the JAR is inert without the Comet
+# plugin/shuffle confs, so it is not put on the classpath otherwise).
+_CORE_JARS_DIR = Path(__file__).resolve().parent.parent / 'jars'
+
+
+def spark_artifact_suffix(version: str) -> str:
+    """Derive the Maven artifact suffix (e.g. ``spark4.1_2.13``) from a Spark
+    version string. Spark 4.x is Scala 2.13-only; PySpark 3.x pip wheels are
+    built against Scala 2.12.
+    """
+    parts = version.split('.')
+    major_minor = f'{parts[0]}.{parts[1]}'
+    scala = '2.13' if int(parts[0]) >= 4 else '2.12'
+    return f'spark{major_minor}_{scala}'
+
+
+def comet_package() -> str:
+    """Comet Maven coordinate matching the installed pyspark version.
+
+    Override per-environment via ``extra_config: spark.jars.packages`` when
+    needed (e.g. a Comet build for an unsupported Spark version).
+    """
+    import pyspark
+
+    return (
+        f'org.apache.datafusion:comet-spark-{spark_artifact_suffix(pyspark.__version__)}'
+        f':{COMET_VERSION}'
+    )
+
 
 def discover_jar_paths(group_list: List[str]) -> List[str]:
     jar_paths = set()
@@ -53,7 +86,7 @@ def discover_maven_packages(group_list: List[str]) -> List[str]:
     return sorted(packages)
 
 
-def collect_jars() -> Tuple[str, str]:
+def collect_jars(comet: bool = False) -> Tuple[str, str]:
     """Collect local JARs and Maven packages for Spark session.
 
     Local JARs in a plugin's ``jars/`` directory are always included via
@@ -62,10 +95,19 @@ def collect_jars() -> Tuple[str, str]:
     them (i.e. a JAR whose name starts with the artifact-id exists locally).
     This allows custom JARs (e.g. mkpipe-tls-helper.jar) to coexist with
     Maven-resolved dependencies.
+
+    When ``comet`` is True, core JARs pre-downloaded into ``mkpipe/jars/``
+    (by ``mkpipe install-jars``) are included via ``spark.jars`` so no Maven
+    resolution is needed at runtime.
     """
     jar_paths: List[str] = []
     jar_names: set = set()
     maven_packages: set = set()
+
+    if comet:
+        for jar in sorted(_CORE_JARS_DIR.glob('*.jar')):
+            jar_paths.append(str(jar))
+            jar_names.add(jar.name)
 
     for group in _ENTRY_POINT_GROUPS:
         try:
@@ -146,6 +188,7 @@ def download_jars() -> None:
     import sys
 
     plugin_info = _discover_plugin_jar_info(_ENTRY_POINT_GROUPS)
+    plugin_info[str(_CORE_JARS_DIR)] = [comet_package()]
     if not plugin_info:
         print('No plugins with JAR_PACKAGES found.')
         return
