@@ -53,10 +53,18 @@ def comet_package() -> str:
             'to a Comet coordinate matching your Spark version.'
         )
 
-    return (
-        f'org.apache.datafusion:comet-spark-{spark_artifact_suffix(version)}'
-        f':{COMET_VERSION}'
-    )
+    return f'org.apache.datafusion:comet-spark-{spark_artifact_suffix(version)}:{COMET_VERSION}'
+
+
+def comet_jar_paths(jars: str) -> List[str]:
+    """Return the Comet JAR entries from a comma-joined jar list.
+
+    Comet accesses package-private Spark internals, so its JAR must share
+    the app classloader with Spark core classes. Plugin JARs must NOT go on
+    the app classpath: their bundled libraries (e.g. jackson) would shadow
+    Spark's own and break session init.
+    """
+    return [j for j in jars.split(',') if 'comet-spark' in Path(j).name]
 
 
 def discover_jar_paths(group_list: List[str]) -> List[str]:
