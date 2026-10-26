@@ -142,7 +142,11 @@ def create_spark_session(
 
     if config and config.comet:
         extra_config = _merge_comet_config(extra_config, packages, jars)
-        logger.info('Comet enabled (packages: %s)', extra_config['spark.jars.packages'])
+        comet_packages = extra_config.get('spark.jars.packages')
+        if comet_packages:
+            logger.info('Comet enabled (packages: %s)', comet_packages)
+        else:
+            logger.info('Comet enabled (local JAR via spark.jars)')
 
     driver_java_options = (
         f'-Duser.timezone={timezone} -XX:ErrorFile=/tmp/java_error%p.log -XX:HeapDumpPath=/tmp '
