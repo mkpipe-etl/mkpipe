@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+import pytest
+
+import pyspark
 from mkpipe.models import SparkConfig
-from mkpipe.plugins.jars import collect_jars, comet_package, spark_artifact_suffix
+from mkpipe.plugins.jars import (
+    SUPPORTED_SPARK_VERSIONS,
+    collect_jars,
+    comet_package,
+    spark_artifact_suffix,
+)
 from mkpipe.spark.session import COMET_CONFS, _merge_comet_config
 
 
@@ -9,6 +17,19 @@ def test_spark_artifact_suffix():
     assert spark_artifact_suffix('4.1.3') == 'spark4.1_2.13'
     assert spark_artifact_suffix('4.0.0') == 'spark4.0_2.13'
     assert spark_artifact_suffix('3.5.1') == 'spark3.5_2.12'
+
+
+def test_installed_pyspark_is_supported():
+    major_minor = '.'.join(pyspark.__version__.split('.')[:2])
+
+    assert major_minor in SUPPORTED_SPARK_VERSIONS
+
+
+def test_comet_package_unsupported_spark_raises(monkeypatch):
+    monkeypatch.setattr(pyspark, '__version__', '4.3.0')
+
+    with pytest.raises(ValueError, match='No Comet 1.1.0 artifact'):
+        comet_package()
 
 
 def test_comet_package_matches_installed_pyspark():

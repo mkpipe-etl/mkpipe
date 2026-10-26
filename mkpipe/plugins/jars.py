@@ -7,6 +7,12 @@ _ENTRY_POINT_GROUPS = ['mkpipe.extractors', 'mkpipe.loaders']
 
 COMET_VERSION = '1.1.0'
 
+# Spark (major.minor) versions for which a matching Comet artifact exists on
+# Maven. Anything else fails fast when building the session instead of
+# resolving a nonexistent artifact at runtime. Override per-environment via
+# ``extra_config: spark.jars.packages`` for unsupported versions.
+SUPPORTED_SPARK_VERSIONS = frozenset({'3.5', '4.0', '4.1'})
+
 # Core-level Maven packages pre-downloaded by `mkpipe install-jars` into
 # mkpipe/jars/ so runtime sessions can stay offline. Served via spark.jars
 # when the comet flag is enabled (the JAR is inert without the Comet
@@ -28,13 +34,27 @@ def spark_artifact_suffix(version: str) -> str:
 def comet_package() -> str:
     """Comet Maven coordinate matching the installed pyspark version.
 
-    Override per-environment via ``extra_config: spark.jars.packages`` when
-    needed (e.g. a Comet build for an unsupported Spark version).
+    Raises ``ValueError`` when the installed pyspark version has no matching
+    Comet artifact on Maven (see ``SUPPORTED_SPARK_VERSIONS``). In that case,
+    pin a supported pyspark version or override per-environment via
+    ``extra_config: spark.jars.packages`` with a Comet coordinate for your
+    Spark version.
     """
     import pyspark
 
+    version = pyspark.__version__
+    major_minor = '.'.join(version.split('.')[:2])
+    if major_minor not in SUPPORTED_SPARK_VERSIONS:
+        supported = ', '.join(sorted(SUPPORTED_SPARK_VERSIONS))
+        raise ValueError(
+            f'No Comet {COMET_VERSION} artifact for pyspark {version} '
+            f'(supported Spark versions: {supported}). Pin a supported '
+            "pyspark version, or set 'spark.jars.packages' in extra_config "
+            'to a Comet coordinate matching your Spark version.'
+        )
+
     return (
-        f'org.apache.datafusion:comet-spark-{spark_artifact_suffix(pyspark.__version__)}'
+        f'org.apache.datafusion:comet-spark-{spark_artifact_suffix(version)}'
         f':{COMET_VERSION}'
     )
 
@@ -188,7 +208,14 @@ def download_jars() -> None:
     import sys
 
     plugin_info = _discover_plugin_jar_info(_ENTRY_POINT_GROUPS)
-    plugin_info[str(_CORE_JARS_DIR)] = [comet_package()]
+    try:
+        comet_pkg = comet_package()
+    except ValueError as exc:
+        # Skip the core Comet jar (e.g. unsupported pyspark version); plugin
+        # jars are still downloaded.
+        print(f'Skipping Comet jar: {exc}')
+    else:
+        plugin_info[str(_CORE_JARS_DIR)] = [comet_pkg]
     if not plugin_info:
         print('No plugins with JAR_PACKAGES found.')
         return

@@ -6,7 +6,7 @@ setup(
     license='Apache License 2.0',
     packages=find_packages(exclude=['tests', 'scripts', 'deploy']),
     install_requires=[
-        'pyspark>=3.5.0',
+        'pyspark>=4.1,<4.2',
         'pydantic>=2.0',
         'PyYAML>=6.0',
         'python-dotenv>=1.0',
