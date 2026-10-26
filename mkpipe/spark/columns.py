@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pyspark.sql import DataFrame, functions as F
@@ -16,6 +16,11 @@ def add_etl_columns(
 ) -> DataFrame:
     if ingested_at_column in df.columns:
         df = df.drop(ingested_at_column)
+    # Spark resolves naive datetimes against the session timezone, which may
+    # differ from the container clock. Pin to UTC so _ingested_at is the true
+    # load instant regardless of spark.sql.session.timeZone.
+    if etl_time.tzinfo is None:
+        etl_time = etl_time.replace(tzinfo=timezone.utc)
     df = df.withColumn(ingested_at_column, F.lit(etl_time).cast(TimestampType()))
 
     if dedup_columns:
