@@ -75,6 +75,19 @@ def test_merge_comet_config_local_jar_skips_maven():
     assert 'comet-spark' not in merged['spark.jars.packages']
 
 
+def test_merge_comet_config_local_jar_without_other_packages():
+    # Regression: Docker images with all JARs pre-downloaded have no Maven
+    # packages at all — the merged config must not require the
+    # spark.jars.packages key (KeyError in the Comet log line).
+    jars = '/opt/venv/lib/python3.13/site-packages/mkpipe/jars/comet-spark-spark4.1_2.13-1.1.0.jar'
+
+    merged = _merge_comet_config({}, '', jars)
+
+    assert 'spark.jars.packages' not in merged
+    for key, value in COMET_CONFS.items():
+        assert merged[key] == value
+
+
 def test_merge_comet_config_user_comet_coordinate_wins():
     user_pkg = 'org.apache.datafusion:comet-spark-spark4.2_2.13:1.2.0'
 
