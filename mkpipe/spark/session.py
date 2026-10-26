@@ -1,4 +1,5 @@
 import logging
+import os
 import random
 import time
 from typing import Dict, Optional
@@ -6,6 +7,7 @@ from typing import Dict, Optional
 import psutil
 
 from ..models import SparkConfig
+from ..plugins.jars import comet_jar_paths
 
 logger = logging.getLogger(__name__)
 
@@ -161,8 +163,16 @@ def create_spark_session(
 
     if jars:
         conf.set('spark.jars', jars)
-        conf.set('spark.driver.extraClassPath', jars)
-        conf.set('spark.executor.extraClassPath', jars)
+        # Only the Comet JAR goes on the driver/executor classpath: Comet
+        # accesses package-private Spark internals and must share the app
+        # classloader with Spark core classes. Plugin JARs stay in the task
+        # classloader only — on the app classpath their bundled libraries
+        # (e.g. jackson) shadow Spark's own and break session init.
+        comet_jars = comet_jar_paths(jars)
+        if comet_jars:
+            classpath = os.pathsep.join(comet_jars)
+            conf.set('spark.driver.extraClassPath', classpath)
+            conf.set('spark.executor.extraClassPath', classpath)
 
     if packages:
         conf.set('spark.jars.packages', packages)

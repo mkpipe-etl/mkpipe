@@ -7,6 +7,7 @@ from mkpipe.models import SparkConfig
 from mkpipe.plugins.jars import (
     SUPPORTED_SPARK_VERSIONS,
     collect_jars,
+    comet_jar_paths,
     comet_package,
     spark_artifact_suffix,
 )
@@ -94,6 +95,20 @@ def test_merge_comet_config_user_comet_coordinate_wins():
     merged = _merge_comet_config({'spark.jars.packages': user_pkg}, '')
 
     assert merged['spark.jars.packages'] == user_pkg
+
+
+def test_comet_jar_paths_filters_plugin_jars():
+    jars = ','.join(
+        [
+            '/v/site-packages/mkpipe/jars/org.apache.datafusion_comet-spark-spark4.1_2.13-1.1.0.jar',
+            '/v/site-packages/mkpipe_loader_file/jars/iceberg-spark-runtime.jar',
+            '/v/site-packages/mkpipe/jars/org.scala-lang.modules_scala-collection-compat_2.13-2.12.0.jar',
+        ]
+    )
+
+    assert comet_jar_paths(jars) == [
+        '/v/site-packages/mkpipe/jars/org.apache.datafusion_comet-spark-spark4.1_2.13-1.1.0.jar'
+    ]
 
 
 def test_collect_jars_comet_flag_without_core_jars_dir():
