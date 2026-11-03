@@ -1,12 +1,16 @@
+import time
 from pathlib import Path
 from typing import List, Optional, Sequence, Union
 
 from .config import load_config
-from .exceptions import ConfigError, TransformError
+from .exceptions import ConfigError, PluginNotFoundError, TransformError
 from .models import ExtractResult, MkpipeConfig, TableConfig
 from .utils import get_logger, set_log_dir
 
 logger = get_logger(__name__)
+
+# Deterministic failures: retrying cannot change the outcome.
+_NON_RETRYABLE_ERRORS = (ConfigError, PluginNotFoundError, TransformError)
 
 
 def _get_config(config: Union[str, Path, MkpipeConfig]) -> MkpipeConfig:
@@ -60,109 +64,143 @@ def _run_table(
     target_name = table.target_name
     replication_method = table.replication_method.value
     pass_on_error = table.pass_on_error
+    max_retries = max(table.max_retries, 0)
+    retry_delay = table.retry_delay
+    attempt = 0
 
-    try:
-        status = backend.get_table_status(pipeline_name, target_name)
-        if status in ('extracting', 'loading'):
+    while True:
+        try:
+            # The in-progress guard protects against concurrent runs; our own
+            # retry already owns the table, so only check it on the first try.
+            if attempt == 0:
+                status = backend.get_table_status(pipeline_name, target_name)
+                if status in ('extracting', 'loading'):
+                    logger.info(
+                        {
+                            'table': target_name,
+                            'status': 'skipped',
+                            'reason': 'already in progress',
+                        }
+                    )
+                    return
+
+            # --- EXTRACT ---
+            backend.manifest_table_update(
+                pipeline_name=pipeline_name,
+                table_name=target_name,
+                status='extracting',
+                replication_method=replication_method,
+                error_message='',
+            )
+
+            last_point = backend.get_last_point(pipeline_name, target_name)
+            data = extractor.extract(table, spark, last_point=last_point)
+
+            if data.df is not None:
+                logger.debug(
+                    {
+                        'table': target_name,
+                        'status': 'schema_after_extract',
+                        'schema': {
+                            f.name: f.dataType.simpleString() for f in data.df.schema.fields
+                        },
+                    }
+                )
+
+            # --- TRANSFORM ---
+            if data.df is not None and transform_fn is not None:
+                logger.info(
+                    {'table': target_name, 'pipeline': pipeline_name, 'status': 'transforming'}
+                )
+                try:
+                    data.df = transform_fn(data.df)
+                except Exception as e:
+                    raise TransformError(f"Transform failed for '{target_name}': {e}") from e
+
+            # --- LOAD ---
+            if data.df is not None:
+                backend.manifest_table_update(
+                    pipeline_name=pipeline_name,
+                    table_name=target_name,
+                    status='loading',
+                    replication_method=replication_method,
+                    error_message='',
+                )
+                loader.load(table, data, spark)
+
+            # --- COMPLETED ---
+            backend.manifest_table_update(
+                pipeline_name=pipeline_name,
+                table_name=target_name,
+                value=data.last_point_value,
+                value_type=table.iterate_column_type,
+                status='completed',
+                replication_method=replication_method,
+                error_message='',
+            )
+
             logger.info(
                 {
                     'table': target_name,
-                    'status': 'skipped',
-                    'reason': 'already in progress',
+                    'pipeline': pipeline_name,
+                    'status': 'completed',
                 }
             )
             return
 
-        # --- EXTRACT ---
-        backend.manifest_table_update(
-            pipeline_name=pipeline_name,
-            table_name=target_name,
-            status='extracting',
-            replication_method=replication_method,
-            error_message='',
-        )
+        except Exception as e:
+            error_msg = str(e)
+            retryable = not isinstance(e, _NON_RETRYABLE_ERRORS)
+            will_retry = retryable and attempt < max_retries
 
-        last_point = backend.get_last_point(pipeline_name, target_name)
-        data = extractor.extract(table, spark, last_point=last_point)
+            if will_retry:
+                attempt += 1
+                logger.warning(
+                    {
+                        'table': target_name,
+                        'pipeline': pipeline_name,
+                        'status': 'retrying',
+                        'attempt': attempt,
+                        'max_retries': max_retries,
+                        'retry_delay': retry_delay,
+                        'error': error_msg,
+                    }
+                )
+            else:
+                logger.exception(
+                    {
+                        'table': target_name,
+                        'pipeline': pipeline_name,
+                        'status': 'failed',
+                        'error': error_msg,
+                    }
+                )
 
-        if data.df is not None:
-            logger.debug(
-                {
-                    'table': target_name,
-                    'status': 'schema_after_extract',
-                    'schema': {f.name: f.dataType.simpleString() for f in data.df.schema.fields},
-                }
-            )
-
-        # --- TRANSFORM ---
-        if data.df is not None and transform_fn is not None:
-            logger.info({'table': target_name, 'pipeline': pipeline_name, 'status': 'transforming'})
             try:
-                data.df = transform_fn(data.df)
-            except Exception as e:
-                raise TransformError(f"Transform failed for '{target_name}': {e}") from e
+                backend.manifest_table_update(
+                    pipeline_name=pipeline_name,
+                    table_name=target_name,
+                    status='failed',
+                    replication_method=replication_method,
+                    error_message=error_msg,
+                )
+            except Exception as be:
+                logger.exception(
+                    {
+                        'table': target_name,
+                        'pipeline': pipeline_name,
+                        'status': 'backend_update_failed',
+                        'error': str(be),
+                    }
+                )
 
-        # --- LOAD ---
-        if data.df is not None:
-            backend.manifest_table_update(
-                pipeline_name=pipeline_name,
-                table_name=target_name,
-                status='loading',
-                replication_method=replication_method,
-                error_message='',
-            )
-            loader.load(table, data, spark)
+            if will_retry:
+                time.sleep(retry_delay)
+                continue
 
-        # --- COMPLETED ---
-        backend.manifest_table_update(
-            pipeline_name=pipeline_name,
-            table_name=target_name,
-            value=data.last_point_value,
-            value_type=table.iterate_column_type,
-            status='completed',
-            replication_method=replication_method,
-            error_message='',
-        )
-
-        logger.info(
-            {
-                'table': target_name,
-                'pipeline': pipeline_name,
-                'status': 'completed',
-            }
-        )
-
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(
-            {
-                'table': target_name,
-                'pipeline': pipeline_name,
-                'status': 'failed',
-                'error': error_msg,
-            }
-        )
-
-        try:
-            backend.manifest_table_update(
-                pipeline_name=pipeline_name,
-                table_name=target_name,
-                status='failed',
-                replication_method=replication_method,
-                error_message=error_msg,
-            )
-        except Exception as be:
-            logger.error(
-                {
-                    'table': target_name,
-                    'pipeline': pipeline_name,
-                    'status': 'backend_update_failed',
-                    'error': str(be),
-                }
-            )
-
-        if not pass_on_error:
-            raise
+            if not pass_on_error:
+                raise
+            return
 
 
 def run(

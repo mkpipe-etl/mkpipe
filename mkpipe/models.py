@@ -63,6 +63,8 @@ class TableConfig(BaseModel):
     write_key: Optional[List[str]] = None
     if_exists: Optional[str] = None
     column_name_case: Optional[str] = None
+    max_retries: int = 2
+    retry_delay: float = 10
 
     @property
     def iterate_columns(self) -> List[str]:
