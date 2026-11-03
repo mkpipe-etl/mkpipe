@@ -332,6 +332,8 @@ pipelines:
         custom_query: "(SELECT id, name, updated_at FROM users {query_filter}) q"
         transform: transforms/clean_users.py::transform
         pass_on_error: false
+        max_retries: 2
+        retry_delay: 10
 ```
 
 ### Table Parameters
@@ -364,6 +366,22 @@ pipelines:
 | `if_exists` | `None` | Target table behavior on full load: `replace` (drop+create, default) or `append` (preserve table, truncate+insert). Inherits from settings if not set |
 | `column_name_case` | `None` | Override column casing for this table: `lower`, `upper`, `as_is` (default: inherits from settings) |
 | `pass_on_error` | `false` | Continue pipeline on this table's failure |
+| `max_retries` | `2` | Extra attempts after a retryable failure (config, plugin and transform errors are never retried) |
+| `retry_delay` | `10` | Seconds to wait between attempts |
+
+### Retries
+
+A failed table is retried in-process up to `max_retries` times, `retry_delay` seconds apart, before the error is re-raised. Intermediate attempts are logged at `warning` with `status: retrying`; only the final failure is logged at `error` with `status: failed` **and the exception traceback** (`logger.exception`), so error trackers group repeated failures by stack trace instead of by message. Orchestrator retries and log-based alerting therefore do not treat transient failures as fatal.
+
+Deterministic failures (`ConfigError`, `PluginNotFoundError`, `TransformError`) are never retried.
+
+```yaml
+tables:
+  - name: sale_cnl
+    target_name: raw_dce__sale_cnl
+    max_retries: 2
+    retry_delay: 10
+```
 
 ---
 
