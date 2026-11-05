@@ -32,6 +32,7 @@ class TableConfig(BaseModel):
     replication_method: ReplicationMethod = ReplicationMethod.FULL
     iterate_column: Optional[Union[str, List[str]]] = None
     iterate_column_type: Optional[str] = None
+    iterate_column_tz: Optional[str] = None
     partitions_column: Optional[str] = None
     partitions_column_type: Optional[str] = None
     partitions_count: int = 10
@@ -83,6 +84,15 @@ class TableConfig(BaseModel):
         if self.write_strategy in (WriteStrategy.UPSERT, WriteStrategy.MERGE):
             if not self.write_key:
                 raise ValueError(f"write_strategy '{self.write_strategy.value}' requires write_key")
+        if self.iterate_column_tz is not None and self.iterate_column_tz not in (
+            'auto',
+            'aware',
+            'naive',
+        ):
+            raise ValueError(
+                f"iterate_column_tz must be 'auto', 'aware' or 'naive', "
+                f"got '{self.iterate_column_tz}'"
+            )
         return self
 
 

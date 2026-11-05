@@ -1,7 +1,9 @@
 import os
 import re
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo
 
 from .base import BaseExtractor
 from ..exceptions import ConfigError
@@ -9,6 +11,80 @@ from ..models import ConnectionConfig, ExtractResult, TableConfig
 from ..utils import get_logger
 
 logger = get_logger(__name__)
+
+# Column types that store true instants. Their watermarks must be stored and
+# compared with an explicit UTC offset: a naive literal such as
+# '2026-11-05 07:11:11.222000' is parsed by the source server in ITS session
+# timezone (e.g. US/Eastern), silently shifting the incremental boundary by
+# the UTC offset and skipping hours of rows.
+_TZ_AWARE_DATA_TYPES = {'timestamp with time zone', 'timestamp_tz', 'timestamp_ltz'}
+
+# Words that may appear inside iterate_column expressions but are never columns.
+_SQL_RESERVED_WORDS = {
+    'and',
+    'as',
+    'cast',
+    'coalesce',
+    'current_date',
+    'current_timestamp',
+    'date_trunc',
+    'epoch',
+    'extract',
+    'from',
+    'greatest',
+    'least',
+    'now',
+    'or',
+    'to_char',
+    'where',
+}
+
+_IDENTIFIER_RE = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
+# Matches a trailing explicit UTC offset ('+00', '-05:00', 'Z', ...).
+_OFFSET_RE = re.compile(r'(?:Z|[+-]\d{2}(?::?\d{2})?)$')
+
+
+def _session_timezone(spark) -> str:
+    try:
+        return spark.conf.get('spark.sql.session.timeZone') or 'UTC'
+    except Exception:
+        return 'UTC'
+
+
+def _epoch_to_datetime(epoch_us: int) -> datetime:
+    """Convert Spark epoch microseconds to a UTC datetime."""
+    return datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(microseconds=int(epoch_us))
+
+
+def _format_epoch_utc(epoch_us: int) -> str:
+    """Render epoch microseconds as a UTC wall string with an explicit '+00'.
+
+    The explicit '+00' suffix keeps the watermark immune to both the python
+    process timezone (pyspark renders collected timestamps in the *local*
+    zone, not the session zone) and the source server's session timezone
+    when the value is embedded in WHERE clauses.
+    """
+    return _epoch_to_datetime(epoch_us).strftime('%Y-%m-%d %H:%M:%S.%f') + '+00'
+
+
+def _format_epoch_wall(epoch_us: int, session_tz: str) -> str:
+    """Render epoch microseconds as a naive wall string in session_tz.
+
+    Naive source columns are interpreted by pgjdbc against the JVM timezone,
+    which mkpipe pins to settings.timezone (== spark session timezone), so
+    rendering the instant back in that zone recovers the original source
+    wall clock regardless of the python process timezone.
+    """
+    try:
+        zone = ZoneInfo(session_tz)
+    except Exception:
+        zone = timezone.utc
+    return (
+        _epoch_to_datetime(epoch_us)
+        .astimezone(zone)
+        .replace(tzinfo=None)
+        .strftime('%Y-%m-%d %H:%M:%S.%f')
+    )
 
 
 class JdbcExtractor(BaseExtractor):
@@ -36,6 +112,18 @@ class JdbcExtractor(BaseExtractor):
     def _jdbc_options(self) -> Dict[str, str]:
         """Override in subclass for extra JDBC properties (RSA key, SSL, OAuth, etc.)"""
         return {}
+
+    def _bounds_projection(self, df, *columns: str):
+        """Project datetime bound columns to epoch microseconds (timezone-free).
+
+        pyspark renders collected timestamps in the python process timezone
+        (TimestampType.fromInternal uses local time), so naive datetimes are
+        ambiguous. Converting inside Spark via unix_micros() keeps the value
+        an unambiguous instant regardless of any timezone.
+        """
+        from pyspark.sql import functions as F
+
+        return df.select(*[F.unix_micros(F.col(c)).alias(c) for c in columns])
 
     def _build_reader(
         self,
@@ -99,6 +187,56 @@ class JdbcExtractor(BaseExtractor):
         parts = [f'({condition_builder(col)})' for col in columns]
         return ' OR '.join(parts)
 
+    def _detect_iterate_columns_tz_aware(
+        self, table: TableConfig, spark, jdbc_url: str
+    ) -> Optional[bool]:
+        """Resolve whether the iterate columns are timezone-aware.
+
+        Returns True/False when the columns resolve against
+        information_schema, and None when detection is not possible
+        (unknown table, unresolvable expression columns, or a source
+        without information_schema support).
+        """
+        candidates = {
+            ident
+            for expr in table.iterate_columns
+            for ident in _IDENTIFIER_RE.findall(expr)
+            if ident.lower() not in _SQL_RESERVED_WORDS
+        }
+        if not candidates:
+            return None
+
+        def _q(value: str) -> str:
+            return "'" + value.replace("'", "''") + "'"
+
+        name = table.name.strip()
+        if '.' in name:
+            schema_part, _, table_part = name.rpartition('.')
+            schema_clause = f'table_schema = {_q(schema_part)} AND table_name = {_q(table_part)}'
+        else:
+            schema_clause = (
+                f'table_schema = ANY (current_schemas(false)) AND table_name = {_q(name)}'
+            )
+        column_list = ', '.join(_q(c) for c in sorted(candidates))
+        query = (
+            f'(SELECT column_name, data_type FROM information_schema.columns '
+            f'WHERE {schema_clause} AND column_name IN ({column_list})) q'
+        )
+        try:
+            rows = self._build_reader(spark, jdbc_url, query).collect()
+        except Exception as exc:
+            logger.warning(
+                {
+                    'table': table.target_name,
+                    'status': 'tz_detection_failed',
+                    'error': str(exc),
+                }
+            )
+            return None
+        if not rows:
+            return None
+        return any(str(row[1]).lower() in _TZ_AWARE_DATA_TYPES for row in rows)
+
     def _extract_incremental(
         self, table: TableConfig, spark, last_point: Optional[str]
     ) -> ExtractResult:
@@ -113,7 +251,7 @@ class JdbcExtractor(BaseExtractor):
         is_multi = table.is_multi_iterate_column
 
         if is_multi:
-            iterate_col_normalized = f"GREATEST({', '.join(columns)})"
+            iterate_col_normalized = f'GREATEST({", ".join(columns)})'
         else:
             iterate_col_normalized = self._normalize_partitions_column(columns[0])
 
@@ -127,7 +265,9 @@ class JdbcExtractor(BaseExtractor):
         fetchsize = table.fetchsize
         jdbc_url = self.build_jdbc_url()
 
-        has_static_bounds = table.filter_lower_bound is not None or table.filter_upper_bound is not None
+        has_static_bounds = (
+            table.filter_lower_bound is not None or table.filter_upper_bound is not None
+        )
 
         # --- Step 1: Get iterate_column bounds (+ partition bounds in one query) ---
         if is_multi:
@@ -139,9 +279,7 @@ class JdbcExtractor(BaseExtractor):
             min_select = f'min({iterate_col_normalized}) AS min_val'
             max_select = f'max({iterate_col_normalized}) AS max_val'
 
-        need_separate_p_bounds = (
-            partitions_count and partitions_column != iterate_col_normalized
-        )
+        need_separate_p_bounds = partitions_count and partitions_column != iterate_col_normalized
         has_static_p_bounds = (
             table.partitions_lower_bound is not None and table.partitions_upper_bound is not None
         )
@@ -153,6 +291,7 @@ class JdbcExtractor(BaseExtractor):
             bounds_base_source = name
 
         if has_static_bounds:
+
             def _static_cond(col):
                 parts = []
                 if table.filter_lower_bound is not None:
@@ -194,6 +333,8 @@ class JdbcExtractor(BaseExtractor):
             write_mode = 'overwrite'
 
         df_bounds = self._build_reader(spark, jdbc_url, bounds_query)
+        if iterate_column_type == 'datetime':
+            df_bounds = self._bounds_projection(df_bounds, 'min_val', 'max_val')
         row = df_bounds.first()
 
         if not row or row[0] is None:
@@ -204,13 +345,48 @@ class JdbcExtractor(BaseExtractor):
             return ExtractResult(df=None, write_mode=write_mode)
 
         min_val, max_val = row[0], row[1]
+        session_tz = _session_timezone(spark)
 
         if iterate_column_type == 'int':
             min_iterate = int(min_val)
             max_iterate = int(max_val)
         elif iterate_column_type == 'datetime':
-            min_iterate = min_val.strftime('%Y-%m-%d %H:%M:%S.%f')
-            max_iterate = max_val.strftime('%Y-%m-%d %H:%M:%S.%f')
+            tz_mode = (table.iterate_column_tz or 'auto').lower()
+            if tz_mode == 'aware':
+                tz_aware = True
+            elif tz_mode == 'naive':
+                tz_aware = False
+            else:
+                tz_aware = self._detect_iterate_columns_tz_aware(table, spark, jdbc_url)
+                if tz_aware is None:
+                    tz_aware = False
+                    logger.warning(
+                        {
+                            'table': table.target_name,
+                            'status': 'tz_detection_unresolved',
+                            'hint': "set iterate_column_tz: 'aware' or 'naive' explicitly",
+                        }
+                    )
+            if tz_aware:
+                min_iterate = _format_epoch_utc(min_val)
+                max_iterate = _format_epoch_utc(max_val)
+                if last_point and not _OFFSET_RE.search(last_point.strip()):
+                    logger.warning(
+                        {
+                            'table': table.target_name,
+                            'status': 'legacy_naive_last_point',
+                            'last_point': last_point,
+                            'hint': (
+                                'timezone-aware iterate column but the stored '
+                                'last_point has no UTC offset; it will be parsed '
+                                'in the source server session timezone. Reset it '
+                                "to '<max>+00' form to avoid skipped rows"
+                            ),
+                        }
+                    )
+            else:
+                min_iterate = _format_epoch_wall(min_val, session_tz)
+                max_iterate = _format_epoch_wall(max_val, session_tz)
         else:
             raise ConfigError(
                 f"Table '{name}': unsupported iterate_column_type '{iterate_column_type}'. "
@@ -220,9 +396,11 @@ class JdbcExtractor(BaseExtractor):
         # --- Step 2: Build filter clause using iterate_column ---
         if has_static_bounds or last_point:
             if iterate_column_type == 'int':
+
                 def _range_cond(col):
                     return f'{col} >= {min_iterate} AND {col} <= {max_iterate}'
             else:
+
                 def _range_cond(col):
                     return f"{col} >= '{min_iterate}' AND {col} <= '{max_iterate}'"
 
@@ -248,6 +426,13 @@ class JdbcExtractor(BaseExtractor):
             updated_query = f'(SELECT * FROM {name} {filter_clause}) q'
 
         # --- Step 3: Resolve partition bounds ---
+        if table.partitions_column_type:
+            p_col_type = table.partitions_column_type
+        elif table.partitions_column:
+            p_col_type = 'int'
+        else:
+            p_col_type = iterate_column_type
+
         if need_separate_p_bounds:
             if has_static_p_bounds:
                 p_lower_raw = table.partitions_lower_bound
@@ -263,27 +448,31 @@ class JdbcExtractor(BaseExtractor):
                     f'max({partitions_column}) AS p_max '
                     f'FROM {bounds_base_source}{p_where}) q'
                 )
-                p_row = self._build_reader(spark, jdbc_url, p_bounds_query).first()
+                df_p_bounds = self._build_reader(spark, jdbc_url, p_bounds_query)
+                if p_col_type == 'datetime':
+                    df_p_bounds = self._bounds_projection(df_p_bounds, 'p_min', 'p_max')
+                p_row = df_p_bounds.first()
                 p_lower_raw = p_row[0] if p_row and p_row[0] is not None else min_iterate
                 p_upper_raw = p_row[1] if p_row and p_row[1] is not None else max_iterate
-
-            if table.partitions_column_type:
-                p_col_type = table.partitions_column_type
-            elif table.partitions_column:
-                p_col_type = 'int'
-            else:
-                p_col_type = iterate_column_type
 
             if p_col_type == 'int':
                 p_lower = int(float(str(p_lower_raw)))
                 p_upper = int(float(str(p_upper_raw)))
             elif p_col_type == 'datetime':
-                if hasattr(p_lower_raw, 'strftime'):
-                    p_lower = p_lower_raw.strftime('%Y-%m-%d %H:%M:%S.%f')
-                    p_upper = p_upper_raw.strftime('%Y-%m-%d %H:%M:%S.%f')
-                else:
-                    p_lower = str(p_lower_raw)
-                    p_upper = str(p_upper_raw)
+                # Partition predicates never drop rows (the first/last Spark
+                # JDBC partitions are unbounded), so only skew is at stake
+                # when the timezone guess here is imperfect.
+                p_is_aware = iterate_column_type == 'datetime' and tz_aware
+
+                def _fmt_p(raw):
+                    if isinstance(raw, str):
+                        return raw
+                    if p_is_aware:
+                        return _format_epoch_utc(raw)
+                    return _format_epoch_wall(raw, session_tz)
+
+                p_lower = _fmt_p(p_lower_raw)
+                p_upper = _fmt_p(p_upper_raw)
             else:
                 p_lower = p_lower_raw
                 p_upper = p_upper_raw

@@ -346,6 +346,7 @@ pipelines:
 | `replication_method` | `full` | `full` or `incremental` |
 | `iterate_column` | `None` | Column(s) for incremental tracking. String for single column or SQL expression (e.g. `greatest(a,b)`), list for multi-column OR logic (e.g. `[createdDate, updatedDate]`) |
 | `iterate_column_type` | `None` | `datetime` or `int` |
+| `iterate_column_tz` | `auto` | Timezone awareness of `iterate_column` for `datetime` types: `auto` (detect via `information_schema`), `aware` (`timestamp with time zone`) or `naive` (`timestamp`). See [Incremental watermark timezones](#incremental-watermark-timezones) |
 | `filter_lower_bound` | `None` | Static lower bound for `iterate_column` (`>=`). Overrides lastpoint when set |
 | `filter_upper_bound` | `None` | Static upper bound for `iterate_column` (`<`). Overrides lastpoint when set |
 | `partitions_column` | iterate_column | Column for Spark JDBC partitioning. Also accepts `expr as alias` (e.g. `"greatest(cdate,udate) as _part_ts"`) |
@@ -766,6 +767,33 @@ SELECT * FROM (
   FROM stg_users
 ) WHERE rn = 1
 ```
+
+### Incremental watermark timezones
+
+The incremental watermark (last_point) is embedded verbatim into the next
+run's `WHERE iterate_column >= '<watermark>'` clause, so its string
+representation must be unambiguous:
+
+- **Timezone-aware columns** (`timestamp with time zone`, detected via
+  `information_schema` when `iterate_column_tz: auto`): the watermark is
+  stored as a UTC instant with an explicit offset, e.g.
+  `2026-11-05 07:11:11.222000+00`. The offset makes the comparison immune
+  to the source server's session timezone — a naive literal is parsed by
+  the server in *its* session timezone (e.g. `US/Eastern`), silently
+  skipping hours of rows.
+- **Naive columns** (`timestamp`): the watermark is the source wall clock
+  time (rendered in `settings.timezone`, which must match the zone the
+  source stores its naive wall times in). Comparison is wall-vs-wall and
+  unaffected by the server session timezone.
+
+Bounds are converted to epoch microseconds inside Spark
+(`unix_micros`) before reaching Python, because pyspark renders collected
+timestamps in the *python process* timezone (`TZ` env of the container),
+not the Spark session timezone.
+
+Legacy watermarks without an offset are still honored (embedded as-is, so
+the server session timezone applies) and log a `legacy_naive_last_point`
+warning — reset them once to the `<max>+00` form to avoid skipped rows.
 
 ---
 
