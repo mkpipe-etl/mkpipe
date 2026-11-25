@@ -79,6 +79,7 @@ def load_config(path: Union[str, Path]) -> MkpipeConfig:
                 destination=pipe_raw['destination'],
                 tables=tables,
                 pass_on_error=pipe_raw.get('pass_on_error', False),
+                ignore_extra_source_columns=pipe_raw.get('ignore_extra_source_columns'),
             )
         )
 

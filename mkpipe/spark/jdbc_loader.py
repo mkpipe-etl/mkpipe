@@ -1,6 +1,6 @@
 import gc
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import quote_plus
 
 from .base import BaseLoader
@@ -102,18 +102,25 @@ class JdbcLoader(BaseLoader):
         insert_cols = ', '.join(f'"{c}"' for c in columns)
         insert_vals = ', '.join(f's."{c}"' for c in columns)
         update_set = ', '.join(f'"{c}" = s."{c}"' for c in update_columns)
+        matched_update = f'WHEN MATCHED THEN UPDATE SET {update_set} ' if update_columns else ''
 
         if dialect in ('postgres', 'postgresql', 'redshift', 'timescaledb', 'sqlite'):
             conflict_cols = ', '.join(f'"{c}"' for c in write_key)
             update_set_pg = ', '.join(f'"{c}" = EXCLUDED."{c}"' for c in update_columns)
+            action = f'DO UPDATE SET {update_set_pg}' if update_columns else 'DO NOTHING'
+            # SQLite needs a WHERE clause to disambiguate ON CONFLICT after SELECT.
+            where = 'WHERE 1 = 1 ' if dialect == 'sqlite' else ''
             return (
                 f'INSERT INTO {target_table} ({insert_cols}) '
-                f'SELECT {insert_cols} FROM {temp_table} '
-                f'ON CONFLICT ({conflict_cols}) DO UPDATE SET {update_set_pg}'
+                f'SELECT {insert_cols} FROM {temp_table} {where}'
+                f'ON CONFLICT ({conflict_cols}) {action}'
             )
 
         if dialect in ('mysql', 'mariadb'):
             update_set_my = ', '.join(f'`{c}` = VALUES(`{c}`)' for c in update_columns)
+            if not update_columns:
+                key = write_key[0]
+                update_set_my = f'`{key}` = {target_table}.`{key}`'
             insert_cols_my = ', '.join(f'`{c}`' for c in columns)
             return (
                 f'INSERT INTO {target_table} ({insert_cols_my}) '
@@ -125,7 +132,7 @@ class JdbcLoader(BaseLoader):
             return (
                 f'MERGE {target_table} AS t '
                 f'USING {temp_table} AS s ON {join_cond} '
-                f'WHEN MATCHED THEN UPDATE SET {update_set} '
+                f'{matched_update}'
                 f'WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals});'
             )
 
@@ -133,7 +140,7 @@ class JdbcLoader(BaseLoader):
             return (
                 f'MERGE INTO {target_table} t '
                 f'USING {temp_table} s ON ({join_cond}) '
-                f'WHEN MATCHED THEN UPDATE SET {update_set} '
+                f'{matched_update}'
                 f'WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})'
             )
 
@@ -141,30 +148,76 @@ class JdbcLoader(BaseLoader):
         return (
             f'MERGE INTO {target_table} AS t '
             f'USING {temp_table} AS s ON {join_cond} '
-            f'WHEN MATCHED THEN UPDATE SET {update_set} '
+            f'{matched_update}'
             f'WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})'
         )
 
     # ── Upsert / Merge via temp table ─────────────────────────────────
 
+    def _target_columns(self, table_name: str, spark) -> List[str]:
+        """Read target column names without scanning table rows."""
+        jdbc_url = self.build_jdbc_url()
+        try:
+            return (
+                spark.read.format('jdbc')
+                .option('url', jdbc_url)
+                .option('dbtable', f'(SELECT * FROM {table_name} WHERE 1 = 0) mkpipe_target_schema')
+                .option('driver', self.driver_jdbc)
+                .load()
+                .columns
+            )
+        except Exception as e:
+            raise LoadError(f"Failed to read target schema for '{table_name}': {e}") from e
+
+    def _align_to_target_columns(
+        self,
+        df,
+        target_name: str,
+        target_columns: List[str],
+        required_columns: Optional[List[str]] = None,
+    ):
+        """Keep source columns present in the target, warning about extras."""
+        source_columns = list(df.columns)
+        target_column_set = set(target_columns)
+        missing_required = [
+            column
+            for column in (required_columns or [])
+            if column not in target_column_set or column not in source_columns
+        ]
+        if missing_required:
+            raise LoadError(
+                f'write_key columns {missing_required} are missing from target or source '
+                f"for '{target_name}'"
+            )
+
+        extra_columns = [column for column in source_columns if column not in target_column_set]
+        if extra_columns:
+            logger.warning(
+                {
+                    'table': target_name,
+                    'status': 'extra_source_columns_ignored',
+                    'columns': extra_columns,
+                }
+            )
+
+        shared_columns = [column for column in source_columns if column in target_column_set]
+        if not shared_columns:
+            raise LoadError(f"Source and target '{target_name}' have no columns in common")
+
+        return df.select(*shared_columns)
+
     def _table_exists(self, table_name: str, spark) -> bool:
         """Check if a table exists in the target database."""
         try:
             jdbc_url = self.build_jdbc_url()
-            spark.read.format('jdbc').option(
-                'url', jdbc_url
-            ).option(
+            spark.read.format('jdbc').option('url', jdbc_url).option(
                 'dbtable', f'(SELECT 1 FROM {table_name} LIMIT 0) q'
-            ).option(
-                'driver', self.driver_jdbc
-            ).load()
+            ).option('driver', self.driver_jdbc).load()
             return True
         except Exception:
             return False
 
-    def _ensure_unique_constraint(
-        self, table_name: str, write_key: List[str], spark
-    ) -> None:
+    def _ensure_unique_constraint(self, table_name: str, write_key: List[str], spark) -> None:
         """Create a unique constraint on *write_key* columns if not already present.
 
         Required by PostgreSQL ``ON CONFLICT`` and similar upsert dialects.
@@ -174,42 +227,34 @@ class JdbcLoader(BaseLoader):
 
         dialect = self._dialect
         if dialect in ('postgres', 'postgresql', 'redshift', 'timescaledb'):
-            sql = (
-                f'ALTER TABLE {table_name} '
-                f'ADD CONSTRAINT "{constraint_name}" UNIQUE ({cols})'
-            )
+            sql = f'ALTER TABLE {table_name} ADD CONSTRAINT "{constraint_name}" UNIQUE ({cols})'
         elif dialect in ('mysql', 'mariadb'):
-            sql = (
-                f'ALTER TABLE {table_name} '
-                f'ADD UNIQUE INDEX `{constraint_name}` ({cols})'
-            )
+            sql = f'ALTER TABLE {table_name} ADD UNIQUE INDEX `{constraint_name}` ({cols})'
         elif dialect == 'sqlserver':
-            sql = (
-                f'ALTER TABLE {table_name} '
-                f'ADD CONSTRAINT [{constraint_name}] UNIQUE ({cols})'
-            )
+            sql = f'ALTER TABLE {table_name} ADD CONSTRAINT [{constraint_name}] UNIQUE ({cols})'
         else:
             # ANSI / Snowflake / Oracle fallback
-            sql = (
-                f'ALTER TABLE {table_name} '
-                f'ADD CONSTRAINT "{constraint_name}" UNIQUE ({cols})'
-            )
+            sql = f'ALTER TABLE {table_name} ADD CONSTRAINT "{constraint_name}" UNIQUE ({cols})'
 
         try:
             self._execute_sql(sql, spark)
-            logger.info({
-                'table': table_name,
-                'status': 'unique_constraint_created',
-                'columns': write_key,
-            })
+            logger.info(
+                {
+                    'table': table_name,
+                    'status': 'unique_constraint_created',
+                    'columns': write_key,
+                }
+            )
         except Exception:
             # Constraint may already exist or DB doesn't enforce it (e.g. Snowflake)
-            logger.debug({
-                'table': table_name,
-                'status': 'unique_constraint_skipped',
-                'columns': write_key,
-                'reason': 'constraint may already exist',
-            })
+            logger.debug(
+                {
+                    'table': table_name,
+                    'status': 'unique_constraint_skipped',
+                    'columns': write_key,
+                    'reason': 'constraint may already exist',
+                }
+            )
 
     def _create_table_for_upsert(
         self,
@@ -220,11 +265,13 @@ class JdbcLoader(BaseLoader):
         spark,
     ) -> None:
         """Create target table with initial data and add unique constraint for write_key."""
-        logger.info({
-            'table': target_name,
-            'status': 'creating_table',
-            'reason': 'target table does not exist, falling back to direct write',
-        })
+        logger.info(
+            {
+                'table': target_name,
+                'status': 'creating_table',
+                'reason': 'target table does not exist, falling back to direct write',
+            }
+        )
         self._write_df(df, 'overwrite', target_name, batchsize)
         self._ensure_unique_constraint(target_name, write_key, spark)
 
@@ -324,6 +371,26 @@ class JdbcLoader(BaseLoader):
             df = df.coalesce(table.write_partitions)
 
         strategy = resolve_write_strategy(table, data)
+        preserve_target = strategy in (
+            WriteStrategy.APPEND,
+            WriteStrategy.UPSERT,
+            WriteStrategy.MERGE,
+        ) or (strategy == WriteStrategy.REPLACE and self.if_exists == 'append')
+        if (
+            table.ignore_extra_source_columns
+            and preserve_target
+            and self._table_exists(target_name, spark)
+        ):
+            target_columns = self._target_columns(target_name, spark)
+            required_columns = (
+                table.write_key if strategy in (WriteStrategy.UPSERT, WriteStrategy.MERGE) else None
+            )
+            df = self._align_to_target_columns(
+                df,
+                target_name,
+                target_columns,
+                required_columns=required_columns,
+            )
 
         logger.info(
             {

@@ -364,6 +364,7 @@ pipelines:
 | `transform` | `None` | Transform function reference: `path/to/file.py::function` |
 | `write_strategy` | `None` | Write strategy: `append`, `replace`, `upsert`, `merge` (see below) |
 | `write_key` | `None` | Key columns for `upsert`/`merge` (required when strategy is upsert or merge) |
+| `ignore_extra_source_columns` | `false` | For JDBC writes, ignore source columns not present in an existing target table; configure globally under `settings` or override per table |
 | `if_exists` | `None` | Target table behavior on full load: `replace` (drop+create, default) or `append` (preserve table, truncate+insert). Inherits from settings if not set |
 | `column_name_case` | `None` | Override column casing for this table: `lower`, `upper`, `as_is` (default: inherits from settings) |
 | `pass_on_error` | `false` | Continue pipeline on this table's failure |
@@ -491,6 +492,44 @@ tables:
 Table-level `if_exists` takes priority over the settings-level default. If the table does not specify it, the settings value is used.
 
 > **Note:** `if_exists` only affects the `replace` write strategy (full load). It has no effect on `append`, `upsert`, or `merge` strategies, which never drop the target table.
+
+### Ignore Extra Source Columns
+
+This JDBC-loader option ignores columns present in the source DataFrame but absent from an existing target table. It does not add columns to an existing table.
+
+Global setting (applies to every JDBC pipeline unless overridden; defaults to `false`):
+
+```yaml
+settings:
+  ignore_extra_source_columns: true
+```
+
+To enable it only for one pipeline, leave the global setting unset (or `false`) and set it on that pipeline. The destination connection is chosen separately for each pipeline:
+
+```yaml
+pipelines:
+  - name: to_postgres
+    source: source_db
+    destination: target_pg
+    ignore_extra_source_columns: true
+    tables:
+      - name: public.users
+        target_name: stg_users
+      - name: public.orders
+        target_name: stg_orders
+        ignore_extra_source_columns: false
+```
+
+Precedence: table → pipeline → global `settings`. An explicit `false` overrides an inherited `true`.
+
+When enabled:
+
+- If the target does not exist, the loader writes all source columns; the initial write creates the target with the full source schema.
+- If an existing target is preserved (`append`, `upsert`, `merge`, or `replace` with `if_exists: append`), the loader intersects source and target columns, writes only matching columns, and logs ignored source columns at warning level. It checks the target schema without reading its rows.
+- With `write_strategy: replace` and `if_exists: replace`, the target is dropped and recreated from the source DataFrame, so source-only columns are included in the newly created table.
+- `write_key` columns are still mandatory for `upsert`/`merge`. On PostgreSQL, when only key columns remain, new keys are inserted and existing keys are left unchanged. Target-only required columns without defaults can still cause a database error.
+
+This option applies to JDBC loaders; non-JDBC destinations are unaffected.
 
 ---
 

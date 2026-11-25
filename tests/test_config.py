@@ -7,16 +7,14 @@ import yaml
 
 from mkpipe.config import load_config
 from mkpipe.exceptions import ConfigError
-from mkpipe.models import BackendConfig, SparkConfig
+from mkpipe.models import BackendConfig, SparkConfig, TableConfig
 
 
 @pytest.fixture
 def write_config(tmp_path: Path):
     def _write(env_data: dict, *, environment: str = 'prod') -> Path:
         path = tmp_path / 'mkpipe_project.yaml'
-        path.write_text(
-            yaml.safe_dump({'default_environment': environment, environment: env_data})
-        )
+        path.write_text(yaml.safe_dump({'default_environment': environment, environment: env_data}))
         return path
 
     return _write
@@ -42,6 +40,8 @@ def test_settings_defaults_when_block_missing(write_config):
     assert cfg.settings.ingestion_id_column == 'mkpipe_id'
     assert cfg.settings.column_name_case == 'as_is'
     assert cfg.settings.if_exists == 'replace'
+    assert cfg.settings.ignore_extra_source_columns is False
+    assert TableConfig(name='src', target_name='dst').ignore_extra_source_columns is None
     assert cfg.settings.backend.variant == 'sqlite'
     assert cfg.settings.spark.master is None
 
@@ -96,7 +96,7 @@ def test_unknown_settings_key_is_ignored(write_config):
 def test_pipelines_and_tables_are_loaded(write_config):
     path = write_config(
         {
-            'settings': {'if_exists': 'append'},
+            'settings': {'if_exists': 'append', 'ignore_extra_source_columns': True},
             'connections': {
                 'src': {'variant': 'postgresql', 'host': 'h'},
                 'dst': {'variant': 'iceberg'},
@@ -107,7 +107,14 @@ def test_pipelines_and_tables_are_loaded(write_config):
                     'source': 'src',
                     'destination': 'dst',
                     'pass_on_error': True,
-                    'tables': [{'name': 'public.users', 'target_name': 'stg_users'}],
+                    'ignore_extra_source_columns': True,
+                    'tables': [
+                        {
+                            'name': 'public.users',
+                            'target_name': 'stg_users',
+                            'ignore_extra_source_columns': False,
+                        }
+                    ],
                 }
             ],
         }
@@ -116,9 +123,12 @@ def test_pipelines_and_tables_are_loaded(write_config):
     cfg = load_config(path)
 
     assert cfg.settings.if_exists == 'append'
+    assert cfg.settings.ignore_extra_source_columns is True
     assert cfg.connections['src'].variant == 'postgresql'
     assert cfg.pipelines[0].pass_on_error is True
+    assert cfg.pipelines[0].ignore_extra_source_columns is True
     assert cfg.pipelines[0].tables[0].target_name == 'stg_users'
+    assert cfg.pipelines[0].tables[0].ignore_extra_source_columns is False
 
 
 def test_missing_file_raises(tmp_path: Path):

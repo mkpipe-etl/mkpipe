@@ -62,6 +62,7 @@ class TableConfig(BaseModel):
     filter_upper_bound: Optional[str] = None
     write_strategy: Optional[WriteStrategy] = None
     write_key: Optional[List[str]] = None
+    ignore_extra_source_columns: Optional[bool] = None
     if_exists: Optional[str] = None
     column_name_case: Optional[str] = None
     max_retries: int = 2
@@ -147,6 +148,7 @@ class SettingsConfig(BaseModel):
     ingested_at_column: str = '_ingested_at'
     ingestion_id_column: str = 'mkpipe_id'
     column_name_case: str = 'as_is'
+    ignore_extra_source_columns: bool = False
     if_exists: str = 'replace'
     backend: BackendConfig = Field(default_factory=BackendConfig)
     spark: SparkConfig = Field(default_factory=SparkConfig)
@@ -158,6 +160,7 @@ class PipelineConfig(BaseModel):
     destination: str
     tables: List[TableConfig]
     pass_on_error: bool = False
+    ignore_extra_source_columns: Optional[bool] = None
 
 
 class MkpipeConfig(BaseModel):

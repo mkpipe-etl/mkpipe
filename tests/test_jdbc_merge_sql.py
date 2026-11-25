@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
 
-from mkpipe.models import ConnectionConfig
+from mkpipe.exceptions import LoadError
+from mkpipe.models import ConnectionConfig, ExtractResult, TableConfig
 from mkpipe.spark.jdbc_loader import JdbcLoader
 
 
@@ -152,15 +154,117 @@ class TestAnsiDialect:
 
 
 class TestEdgeCases:
-    def test_single_column_key_and_value(self):
-        """Table with only a key column — update set should be empty string join."""
-        loader = _make_loader('postgres')
-        sql = loader._build_merge_sql('tmp', 'target', ['id'], ['id'], [])
-        assert 'ON CONFLICT ("id") DO UPDATE SET ' in sql
+    @pytest.mark.parametrize(
+        'dialect', ['postgres', 'postgresql', 'redshift', 'timescaledb', 'sqlite']
+    )
+    def test_key_only_conflict_does_nothing(self, dialect):
+        loader = _make_loader(dialect)
+        sql = loader._build_upsert_sql('tmp', 'target', ['id'], ['id'])
+        assert sql.endswith('ON CONFLICT ("id") DO NOTHING')
 
-    def test_all_columns_are_keys(self):
-        """All columns are keys — no columns to update."""
-        loader = _make_loader('sqlserver')
+    @pytest.mark.parametrize('dialect', ['sqlserver', 'oracle', 'oracledb', 'ansi', 'snowflake'])
+    def test_key_only_merge_inserts_unmatched_rows(self, dialect):
+        loader = _make_loader(dialect)
         cols = ['a', 'b']
         sql = loader._build_merge_sql('tmp', 'target', cols, cols, [])
-        assert 'WHEN MATCHED THEN UPDATE SET ' in sql
+        assert 'WHEN MATCHED' not in sql
+        assert 'WHEN NOT MATCHED THEN INSERT' in sql
+
+    @pytest.mark.parametrize('dialect', ['mysql', 'mariadb'])
+    def test_key_only_duplicate_preserves_matched_row(self, dialect):
+        loader = _make_loader(dialect)
+        sql = loader._build_upsert_sql('tmp', 'target', ['id'], ['id'])
+        assert sql.endswith('ON DUPLICATE KEY UPDATE `id` = target.`id`')
+
+
+class _FakeDataFrame:
+    def __init__(self, columns):
+        self.columns = columns
+        self.selected = None
+
+    def select(self, *columns):
+        self.selected = list(columns)
+        return self
+
+
+class TestIgnoreExtraSourceColumns:
+    def test_direct_loader_does_not_reuse_previous_table_override(self, monkeypatch):
+        loader = _make_loader('postgres')
+        monkeypatch.setattr('mkpipe.spark.jdbc_loader.add_etl_columns', lambda df, *a, **kw: df)
+        monkeypatch.setattr(loader, '_table_exists', lambda *a: True)
+        monkeypatch.setattr(loader, '_target_columns', lambda *a: ['id'])
+        monkeypatch.setattr(loader, '_write_df', lambda *a: None)
+
+        first = _FakeDataFrame(['id', 'extra'])
+        second = _FakeDataFrame(['id', 'extra'])
+        table = TableConfig(name='src', target_name='dst')
+        loader.load(
+            table.model_copy(update={'ignore_extra_source_columns': True}),
+            ExtractResult(df=first, write_mode='append'),
+            None,
+        )
+        loader.load(table, ExtractResult(df=second, write_mode='append'), None)
+        assert first.selected == ['id']
+        assert second.selected is None
+
+    def test_target_schema_query_is_metadata_only(self):
+        loader = _make_loader('postgres')
+
+        class Reader:
+            def __init__(self):
+                self.options = {}
+
+            def format(self, value):
+                assert value == 'jdbc'
+                return self
+
+            def option(self, key, value):
+                self.options[key] = value
+                return self
+
+            def load(self):
+                return type('Frame', (), {'columns': ['id', 'name']})()
+
+        class Spark:
+            read = Reader()
+
+        assert loader._target_columns('stg_users', Spark()) == ['id', 'name']
+        assert 'WHERE 1 = 0' in Spark.read.options['dbtable']
+
+    def test_selects_only_target_columns_and_logs_extras(self, caplog):
+        loader = _make_loader('postgres')
+        df = _FakeDataFrame(['id', 'name', 'new_source_col'])
+
+        result = loader._align_to_target_columns(
+            df,
+            target_name='stg_users',
+            target_columns=['id', 'name', '_ingested_at'],
+        )
+
+        assert result is df
+        assert df.selected == ['id', 'name']
+        assert 'new_source_col' in caplog.text
+        assert 'WARNING' in caplog.text
+
+    def test_missing_write_key_in_target_raises(self):
+        loader = _make_loader('postgres')
+        df = _FakeDataFrame(['id', 'name'])
+
+        with pytest.raises(LoadError, match='write_key.*missing from target'):
+            loader._align_to_target_columns(
+                df,
+                target_name='stg_users',
+                target_columns=['name'],
+                required_columns=['id'],
+            )
+
+    def test_no_shared_columns_raises(self):
+        loader = _make_loader('postgres')
+        df = _FakeDataFrame(['new_source_col'])
+
+        with pytest.raises(LoadError, match='no columns in common'):
+            loader._align_to_target_columns(
+                df,
+                target_name='stg_users',
+                target_columns=['id', 'name'],
+            )

@@ -4,7 +4,7 @@ from typing import List, Optional, Sequence, Union
 
 from .config import load_config
 from .exceptions import ConfigError, PluginNotFoundError, TransformError
-from .models import ExtractResult, MkpipeConfig, TableConfig
+from .models import ExtractResult, MkpipeConfig, PipelineConfig, SettingsConfig, TableConfig
 from .utils import get_logger, set_log_dir
 
 logger = get_logger(__name__)
@@ -17,6 +17,16 @@ def _get_config(config: Union[str, Path, MkpipeConfig]) -> MkpipeConfig:
     if isinstance(config, MkpipeConfig):
         return config
     return load_config(config)
+
+
+def _ignore_extra_source_columns(
+    table: TableConfig, pipeline: PipelineConfig, settings: SettingsConfig
+) -> bool:
+    if table.ignore_extra_source_columns is not None:
+        return table.ignore_extra_source_columns
+    if pipeline.ignore_extra_source_columns is not None:
+        return pipeline.ignore_extra_source_columns
+    return settings.ignore_extra_source_columns
 
 
 def _filter_tables_by_tags(
@@ -258,8 +268,14 @@ def run(
                     config_dir = str(Path(config).parent)
                 transform_fn = load_transform_fn(tbl.transform, base_dir=config_dir)
 
-            effective_pass = tbl.pass_on_error or pipe.pass_on_error
-            tbl_with_pass = tbl.model_copy(update={'pass_on_error': effective_pass})
+            tbl_with_pass = tbl.model_copy(
+                update={
+                    'pass_on_error': tbl.pass_on_error or pipe.pass_on_error,
+                    'ignore_extra_source_columns': _ignore_extra_source_columns(
+                        tbl, pipe, cfg.settings
+                    ),
+                }
+            )
 
             # Resolve column_name_case: table-level override > settings default
             loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
@@ -342,7 +358,14 @@ def load(
                 loader.column_name_case = tbl.column_name_case or cfg.settings.column_name_case
                 loader.if_exists = tbl.if_exists or cfg.settings.if_exists
                 data = ExtractResult(df=df, write_mode=write_mode)
-                loader.load(tbl, data, spark)
+                effective_table = tbl.model_copy(
+                    update={
+                        'ignore_extra_source_columns': _ignore_extra_source_columns(
+                            tbl, pipe, cfg.settings
+                        ),
+                    }
+                )
+                loader.load(effective_table, data, spark)
                 return
 
     raise ConfigError(f"Table '{table}' not found in any pipeline")
